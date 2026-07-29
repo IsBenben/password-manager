@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Password Manager",
+  "version": "1.0.0",
+  "description": "Auto-fill passwords from local password manager",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:33445/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Password Manager"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "icons": {
+    "128": "icon-128.png"
+  },
+  "author": "Password Manager"
+}
