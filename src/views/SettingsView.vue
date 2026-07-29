@@ -1,0 +1,309 @@
+<template>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>{{ i18n.t('app.title') }}</h2>
+      </div>
+      <nav>
+        <router-link to="/list" class="nav-item">
+          <span class="nav-icon">&#128273;</span> {{ i18n.t('nav.all_passwords') }}
+        </router-link>
+        <router-link to="/settings" class="nav-item active">
+          <span class="nav-icon">&#9881;</span> {{ i18n.t('nav.settings') }}
+        </router-link>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <header class="top-bar">
+        <h2>{{ i18n.t('settings.title') }}</h2>
+      </header>
+
+      <div class="settings-body">
+        <section class="setting-section">
+          <h3>{{ i18n.t('settings.master_password') }}</h3>
+          <form @submit.prevent="handleChangePassword" class="setting-form">
+            <div class="field">
+              <label>{{ i18n.t('settings.current_password') }}</label>
+              <input v-model="changePwd.old" type="password" />
+            </div>
+            <div class="field">
+              <label>{{ i18n.t('settings.new_password') }}</label>
+              <input v-model="changePwd.new" type="password" />
+            </div>
+            <div class="field">
+              <label>{{ i18n.t('settings.confirm_password') }}</label>
+              <input v-model="changePwd.confirm" type="password" />
+            </div>
+            <p v-if="pwdError" class="error">{{ pwdError }}</p>
+            <p v-if="pwdSuccess" class="success">{{ pwdSuccess }}</p>
+            <button type="submit" class="btn-primary" :disabled="changingPwd">
+              {{ changingPwd ? i18n.t('settings.changing') : i18n.t('settings.change_password') }}
+            </button>
+          </form>
+        </section>
+
+        <section class="setting-section">
+          <h3>{{ i18n.t('settings.git_sync') }}</h3>
+          <form @submit.prevent="handleGitConfig" class="setting-form">
+            <div class="field">
+              <label>{{ i18n.t('settings.git_remote') }}</label>
+              <input v-model="gitRemote" type="text" :placeholder="i18n.t('settings.git_remote_placeholder')" />
+            </div>
+            <div class="field">
+              <label>{{ i18n.t('settings.font_family') }}</label>
+              <input v-model="fontFamily" type="text" :placeholder="i18n.t('settings.font_placeholder')" />
+            </div>
+            <p v-if="gitError" class="error">{{ gitError }}</p>
+            <p v-if="gitSuccess" class="success">{{ gitSuccess }}</p>
+            <div class="btn-group">
+              <button type="submit" class="btn-primary">{{ i18n.t('settings.save_config') }}</button>
+              <button type="button" class="btn-secondary" @click="handleGitPush">{{ i18n.t('settings.push_to_git') }}</button>
+              <button type="button" class="btn-secondary" @click="handleGitPull">{{ i18n.t('settings.pull_from_git') }}</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="setting-section">
+          <h3>{{ i18n.t('settings.session') }}</h3>
+          <form @submit.prevent="handleSessionConfig" class="setting-form">
+            <div class="field">
+              <label>{{ i18n.t('settings.session_timeout') }}</label>
+              <input v-model.number="sessionTimeout" type="number" min="1" max="1440" />
+            </div>
+            <p v-if="sessionError" class="error">{{ sessionError }}</p>
+            <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
+            <button type="submit" class="btn-primary">{{ i18n.t('settings.save_session') }}</button>
+          </form>
+        </section>
+
+        <section class="setting-section">
+          <h3>{{ i18n.t('settings.import_export') }}</h3>
+          <form @submit.prevent="handleExport" class="setting-form">
+            <div class="field">
+              <label>{{ i18n.t('settings.export_path') }}</label>
+              <input v-model="exportPath" type="text" :placeholder="i18n.t('settings.export_placeholder')" />
+            </div>
+            <p v-if="exportMsg" :class="exportMsg.startsWith('Error') ? 'error' : 'success'">{{ exportMsg }}</p>
+            <button type="submit" class="btn-secondary">{{ i18n.t('settings.export_btn') }}</button>
+          </form>
+          <form @submit.prevent="handleImport" class="setting-form" style="margin-top: 1rem;">
+            <div class="field">
+              <label>{{ i18n.t('settings.import_path') }}</label>
+              <input v-model="importPath" type="text" :placeholder="i18n.t('settings.import_placeholder')" />
+            </div>
+            <p v-if="importMsg" :class="importMsg.startsWith('Error') ? 'error' : 'success'">{{ importMsg }}</p>
+            <button type="submit" class="btn-secondary">{{ i18n.t('settings.import_btn') }}</button>
+          </form>
+        </section>
+
+        <section class="setting-section">
+          <h3>{{ i18n.t('settings.about') }}</h3>
+          <p class="about-text">{{ i18n.t('app.title') }} {{ i18n.t('app.version') }}</p>
+          <p class="about-text">{{ i18n.t('settings.data_path') }}</p>
+        </section>
+      </div>
+    </main>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/authStore'
+import { useConfigStore } from '../stores/configStore'
+import { usePasswordStore } from '../stores/passwordStore'
+import { useI18nStore } from '../stores/i18nStore'
+import { invoke } from '@tauri-apps/api/core'
+
+const router = useRouter()
+const auth = useAuthStore()
+const configStore = useConfigStore()
+const passwordStore = usePasswordStore()
+const i18n = useI18nStore()
+
+const changePwd = ref({ old: '', new: '', confirm: '' })
+const pwdError = ref('')
+const pwdSuccess = ref('')
+const changingPwd = ref(false)
+
+const gitRemote = ref('')
+const fontFamily = ref('')
+const gitError = ref('')
+const gitSuccess = ref('')
+
+const sessionTimeout = ref(30)
+const sessionError = ref('')
+const sessionSuccess = ref('')
+
+const exportPath = ref('')
+const importPath = ref('')
+const exportMsg = ref('')
+const importMsg = ref('')
+
+onMounted(async () => {
+  if (!auth.checkSession()) {
+    router.push('/')
+    return
+  }
+  gitRemote.value = configStore.config.git_remote
+  fontFamily.value = configStore.config.font_family
+  sessionTimeout.value = configStore.config.session_timeout_minutes
+})
+
+async function handleChangePassword() {
+  pwdError.value = ''
+  pwdSuccess.value = ''
+
+  if (changePwd.value.new !== changePwd.value.confirm) {
+    pwdError.value = i18n.t('settings.error_match')
+    return
+  }
+  if (changePwd.value.new.length < 12) {
+    pwdError.value = i18n.t('settings.error_length')
+    return
+  }
+
+  changingPwd.value = true
+  try {
+    await passwordStore.changeMasterPassword(changePwd.value.old, changePwd.value.new)
+    auth.currentPassword = changePwd.value.new
+    pwdSuccess.value = i18n.t('settings.success_changed')
+    changePwd.value = { old: '', new: '', confirm: '' }
+  } catch (e: any) {
+    pwdError.value = typeof e === 'string' ? e : i18n.t('settings.error_change')
+  } finally {
+    changingPwd.value = false
+  }
+}
+
+async function handleGitConfig() {
+  gitError.value = ''
+  gitSuccess.value = ''
+  try {
+    await configStore.updateConfig({
+      git_remote: gitRemote.value,
+      font_family: fontFamily.value,
+      session_timeout_minutes: configStore.config.session_timeout_minutes,
+    })
+    document.documentElement.style.setProperty('--app-font', fontFamily.value)
+    gitSuccess.value = i18n.t('settings.success_config')
+  } catch (e: any) {
+    gitError.value = typeof e === 'string' ? e : i18n.t('settings.error_config')
+  }
+}
+
+async function handleGitPush() {
+  gitError.value = ''
+  gitSuccess.value = ''
+  try {
+    const result: string = await invoke('git_push', { message: i18n.t('settings.git_commit_message') })
+    gitSuccess.value = result
+  } catch (e: any) {
+    gitError.value = typeof e === 'string' ? e : i18n.t('settings.push_failed')
+  }
+}
+
+async function handleGitPull() {
+  gitError.value = ''
+  gitSuccess.value = ''
+  try {
+    const result: string = await invoke('git_pull')
+    gitSuccess.value = result
+  } catch (e: any) {
+    gitError.value = typeof e === 'string' ? e : i18n.t('settings.pull_failed')
+  }
+}
+
+async function handleSessionConfig() {
+  sessionError.value = ''
+  sessionSuccess.value = ''
+  if (sessionTimeout.value < 1 || sessionTimeout.value > 1440) {
+    sessionError.value = i18n.t('settings.error_timeout_range')
+    return
+  }
+  try {
+    await configStore.updateConfig({
+      git_remote: configStore.config.git_remote,
+      font_family: configStore.config.font_family,
+      session_timeout_minutes: sessionTimeout.value,
+    })
+    auth.setSessionTimeout(sessionTimeout.value)
+    sessionSuccess.value = i18n.t('settings.success_session_timeout')
+  } catch (e: any) {
+    sessionError.value = typeof e === 'string' ? e : i18n.t('settings.error_session_save')
+  }
+}
+
+async function handleExport() {
+  exportMsg.value = ''
+  if (!exportPath.value) {
+    exportMsg.value = 'Error: ' + i18n.t('settings.error_export_path')
+    return
+  }
+  try {
+    const result: string = await invoke('export_json', { path: exportPath.value })
+    exportMsg.value = result
+  } catch (e: any) {
+    exportMsg.value = 'Error: ' + (typeof e === 'string' ? e : i18n.t('settings.error_export'))
+  }
+}
+
+async function handleImport() {
+  importMsg.value = ''
+  if (!importPath.value) {
+    importMsg.value = 'Error: ' + i18n.t('settings.error_import_path')
+    return
+  }
+  const pwd = prompt(i18n.t('settings.prompt_import_password'))
+  if (!pwd) return
+  try {
+    const result: string = await invoke('import_json', { path: importPath.value, password: pwd })
+    importMsg.value = result
+    await passwordStore.fetchEntries()
+  } catch (e: any) {
+    importMsg.value = 'Error: ' + (typeof e === 'string' ? e : i18n.t('settings.error_import'))
+  }
+}
+</script>
+
+<style scoped>
+.layout { display: flex; height: 100vh; }
+.sidebar {
+  width: 240px; background: var(--card-bg); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.sidebar-header { padding: 1.25rem; border-bottom: 1px solid var(--border); }
+.sidebar-header h2 { margin: 0; font-size: 1.125rem; }
+nav { flex: 1; padding: 0.75rem; }
+.nav-item {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.625rem 0.75rem;
+  border-radius: 6px; color: var(--text); text-decoration: none; font-size: 0.9375rem;
+}
+.nav-item:hover, .nav-item.active { background: var(--hover-bg); }
+.main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.top-bar { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
+.top-bar h2 { margin: 0; font-size: 1.25rem; }
+.settings-body { flex: 1; overflow-y: auto; padding: 1.5rem; }
+.setting-section {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem;
+}
+.setting-section h3 { margin: 0 0 1rem; font-size: 1rem; }
+.setting-form { max-width: 400px; }
+.field { margin-bottom: 0.75rem; }
+label { display: block; margin-bottom: 0.25rem; font-size: 0.8125rem; font-weight: 500; }
+input {
+  width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 0.9375rem; background: var(--bg); color: var(--text); box-sizing: border-box;
+}
+input:focus { outline: none; border-color: var(--primary); }
+.error { color: var(--danger); font-size: 0.875rem; }
+.success { color: var(--success); font-size: 0.875rem; }
+.btn-primary, .btn-secondary { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem; margin-top: 0.5rem; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-secondary { background: var(--hover-bg); color: var(--text); margin-left: 0.5rem; }
+.btn-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.btn-group button { margin: 0; }
+.about-text { font-size: 0.875rem; color: var(--text-secondary); margin: 0.25rem 0; }
+</style>
