@@ -3,8 +3,11 @@ import { ref, computed } from 'vue'
 
 export type ThemeMode = 'system' | 'light' | 'dark'
 
+const ACCENT_KEY = 'pm_accent'
+
 export const useThemeStore = defineStore('theme', () => {
   const theme = ref<ThemeMode>('system')
+  const accentColor = ref('')
   let mediaQuery: MediaQueryList | null = null
 
   const effectiveTheme = computed(() => {
@@ -25,6 +28,10 @@ export const useThemeStore = defineStore('theme', () => {
     if (saved === 'light' || saved === 'dark' || saved === 'system') {
       theme.value = saved
     }
+    const savedAccent = localStorage.getItem(ACCENT_KEY)
+    if (savedAccent) {
+      accentColor.value = savedAccent
+    }
     apply()
   }
 
@@ -44,13 +51,28 @@ export const useThemeStore = defineStore('theme', () => {
     apply()
   }
 
+  function setAccentColor(color: string) {
+    accentColor.value = color
+    if (color) {
+      localStorage.setItem(ACCENT_KEY, color)
+    } else {
+      localStorage.removeItem(ACCENT_KEY)
+    }
+    apply()
+  }
+
   function apply() {
     document.documentElement.classList.toggle('dark', effectiveTheme.value === 'dark')
+    if (accentColor.value) {
+      document.documentElement.style.setProperty('--primary', accentColor.value)
+    } else {
+      document.documentElement.style.removeProperty('--primary')
+    }
   }
 
   function cleanup() {
     mediaQuery?.removeEventListener('change', systemChanged)
   }
 
-  return { theme, effectiveTheme, init, toggle, set, apply, cleanup }
+  return { theme, effectiveTheme, accentColor, init, toggle, set, setAccentColor, apply, cleanup }
 })

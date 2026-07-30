@@ -155,6 +155,8 @@ export const en = {
     theme_light: 'Light',
     theme_dark: 'Dark',
     theme_system: 'System default',
+    accent_color: 'Accent Color',
+    accent_reset: 'Reset',
     git_commit_message: 'Update password data',
     about: 'About',
     data_path: 'Data stored at: ~/.password-manager/data.json',
