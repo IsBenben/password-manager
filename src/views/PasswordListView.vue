@@ -5,12 +5,15 @@
     <main class="main-content">
       <header class="top-bar">
         <div class="search-box">
-          <input
-            v-model="searchQuery"
-            type="text"
-            :placeholder="i18n.t('list.search_placeholder')"
-            @input="onSearch"
-          />
+          <div class="search-input-wrap">
+            <input
+              v-model="searchQuery"
+              type="text"
+              :placeholder="i18n.t('list.search_placeholder')"
+              @input="onSearch"
+            />
+            <button v-if="searchQuery" class="search-clear" @click="clearSearch" :title="i18n.t('list.clear_search')">&#x2715;</button>
+          </div>
           <div class="search-info">
             <span v-if="searchQuery">{{ i18n.t('list.search_count', String(store.entries.length), String(totalCount)) }}</span>
             <span v-else>{{ i18n.t('list.total_sites') }}: {{ totalCount }}</span>
@@ -24,7 +27,6 @@
         <div v-else-if="store.entries.length === 0" class="empty">
           <p v-if="searchQuery">{{ i18n.t('list.empty_search') }}</p>
           <p v-else>{{ i18n.t('list.empty') }}</p>
-          <button v-if="searchQuery" class="clear-search" @click="clearSearch">{{ i18n.t('list.clear_search') }}</button>
         </div>
         <div v-else class="entries-list">
           <div
@@ -178,11 +180,19 @@ function autofillLabel(entry: PasswordEntry): string {
   padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
 }
 .search-box { flex: 1; }
-.search-box input {
-  width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border);
+.search-input-wrap { position: relative; display: flex; align-items: center; }
+.search-input-wrap input {
+  width: 100%; padding: 0.5rem 2rem 0.5rem 0.75rem; border: 1px solid var(--border);
   border-radius: 6px; font-size: 0.9375rem; background: var(--bg); color: var(--text); box-sizing: border-box;
 }
-.search-box input:focus { outline: none; border-color: var(--primary); }
+.search-input-wrap input:focus { outline: none; border-color: var(--primary); }
+.search-clear {
+  position: absolute; right: 0.375rem; top: 50%; transform: translateY(-50%);
+  width: 1.25rem; height: 1.25rem; padding: 0; border: none; border-radius: 50%;
+  background: var(--text-secondary); color: var(--bg); font-size: 0.625rem;
+  line-height: 1.25rem; text-align: center; cursor: pointer;
+}
+.search-clear:hover { background: var(--primary); }
 .search-info { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.125rem; }
 .btn-primary {
   padding: 0.5rem 1rem; background: var(--primary); color: #fff;
@@ -212,10 +222,4 @@ function autofillLabel(entry: PasswordEntry): string {
 .entry-tags { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.125rem; }
 .entry-category { display: inline-block; font-size: 0.625rem; padding: 0.0625rem 0.375rem; border-radius: 3px; background: var(--hover-bg); color: var(--text-secondary); }
 .entry-date { font-size: 0.75rem; color: var(--text-secondary); }
-.clear-search {
-  display: block; margin-top: 0.5rem; padding: 0.375rem 0.75rem;
-  background: none; border: 1px solid var(--primary); border-radius: 4px;
-  color: var(--primary); cursor: pointer; font-size: 0.875rem;
-}
-.clear-search:hover { background: var(--primary); color: #fff; }
 </style>
