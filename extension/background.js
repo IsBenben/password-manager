@@ -9,6 +9,34 @@ function bgT(key) {
   return msgs[lang][key] || msgs.en[key];
 }
 
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: 'pm-root',
+    title: '密码管理器',
+    contexts: ['editable'],
+  });
+  chrome.contextMenus.create({
+    id: 'pm-fill-user',
+    parentId: 'pm-root',
+    title: '填充用户名',
+    contexts: ['editable'],
+  });
+  chrome.contextMenus.create({
+    id: 'pm-fill-pwd',
+    parentId: 'pm-root',
+    title: '填充密码',
+    contexts: ['editable'],
+  });
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (!tab?.id || !tab.url) return;
+  const { cachedEntries, cachedUrl } = await chrome.storage.session.get(['cachedEntries', 'cachedUrl']);
+  if (cachedUrl !== tab.url || !cachedEntries?.length) return;
+  const fillType = info.menuItemId === 'pm-fill-pwd' ? 'password' : 'username';
+  chrome.tabs.sendMessage(tab.id, { type: 'FILL_TARGET', entries: cachedEntries, fillType });
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return;
   if (message.type === 'DECRYPT') {
