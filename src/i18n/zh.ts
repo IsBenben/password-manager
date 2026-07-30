@@ -1,5 +1,6 @@
 export const zh = {
   app: { title: '密码管理器', version: 'v0.1.0', switch_language: '切换语言 / Switch language', theme_light: '浅色模式', theme_dark: '深色模式' },
+  dialog: { confirm: '确定', cancel: '取消' },
   login: {
     setup_title: '设置主密码',
     setup_subtitle: '创建您的主密码来加密数据',

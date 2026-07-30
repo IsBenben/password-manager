@@ -1,5 +1,6 @@
 export const en = {
   app: { title: 'Password Manager', version: 'v0.1.0', switch_language: 'Switch language / 切换语言', theme_light: 'Light mode', theme_dark: 'Dark mode' },
+  dialog: { confirm: 'Confirm', cancel: 'Cancel' },
   login: {
     setup_title: 'Set Master Password',
     setup_subtitle: 'Create your master password to encrypt your data',

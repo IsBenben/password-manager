@@ -8,6 +8,8 @@
         {{ i18n.langLabel }}
       </button>
     </div>
+    <ConfirmDialog />
+    <Toast />
     <router-view />
   </div>
 </template>
@@ -17,6 +19,8 @@ import { useConfigStore } from './stores/configStore'
 import { useI18nStore } from './stores/i18nStore'
 import { useAuthStore } from './stores/authStore'
 import { useThemeStore } from './stores/themeStore'
+import ConfirmDialog from './components/ConfirmDialog.vue'
+import Toast from './components/Toast.vue'
 import { onMounted } from 'vue'
 
 const configStore = useConfigStore()

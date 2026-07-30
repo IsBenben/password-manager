@@ -138,12 +138,15 @@ import { useAuthStore } from '../stores/authStore'
 import { useI18nStore } from '../stores/i18nStore'
 import PasswordForm from '../components/PasswordForm.vue'
 import AppSidebar from '../components/AppSidebar.vue'
+import { showConfirm, showPrompt } from '../stores/dialogStore'
+import { useToast } from '../stores/toastStore'
 
 const route = useRoute()
 const router = useRouter()
 const store = usePasswordStore()
 const auth = useAuthStore()
 const i18n = useI18nStore()
+const toast = useToast()
 
 const entry = ref<any>(null)
 const loading = ref(true)
@@ -194,13 +197,19 @@ async function decryptEntry() {
   try {
     entry.value = await store.getEntry(route.params.id as string, auth.currentPassword)
   } catch {
-    const pwd = prompt(i18n.t('detail.prompt_password'))
+    const pwd = await showPrompt({
+      title: i18n.t('detail.prompt_password'),
+      message: '',
+      inputType: 'password',
+      confirmText: i18n.t('dialog.confirm'),
+      cancelText: i18n.t('dialog.cancel'),
+    })
     if (pwd) {
       try {
         await auth.verifyPassword(pwd)
         entry.value = await store.getEntry(route.params.id as string, auth.currentPassword)
       } catch {
-        alert(i18n.t('detail.error_incorrect'))
+        toast.error(i18n.t('detail.error_incorrect'))
         router.push('/list')
       }
     } else {
@@ -258,7 +267,13 @@ async function handleToggleFav() {
 }
 
 async function handleDelete() {
-  if (!confirm(i18n.t('detail.confirm_delete'))) return
+  const ok = await showConfirm({
+    title: i18n.t('detail.confirm_delete'),
+    message: '',
+    confirmText: i18n.t('detail.delete'),
+    cancelText: i18n.t('dialog.cancel'),
+  })
+  if (!ok) return
   await store.deleteEntry(route.params.id as string)
   router.push('/list')
 }
