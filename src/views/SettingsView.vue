@@ -54,6 +54,10 @@
               <label>{{ i18n.t('settings.theme') }}</label>
               <div class="radio-group">
                 <label class="radio-row">
+                  <input v-model="themeMode" type="radio" value="system" @change="updateTheme" />
+                  {{ i18n.t('settings.theme_system') }}
+                </label>
+                <label class="radio-row">
                   <input v-model="themeMode" type="radio" value="light" @change="updateTheme" />
                   {{ i18n.t('settings.theme_light') }}
                 </label>

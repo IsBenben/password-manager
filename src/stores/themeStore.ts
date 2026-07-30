@@ -1,34 +1,56 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
-export type Theme = 'light' | 'dark'
+export type ThemeMode = 'system' | 'light' | 'dark'
 
 export const useThemeStore = defineStore('theme', () => {
-  const theme = ref<Theme>('light')
+  const theme = ref<ThemeMode>('system')
+  let mediaQuery: MediaQueryList | null = null
+
+  const effectiveTheme = computed(() => {
+    if (theme.value !== 'system') return theme.value
+    return mediaQuery?.matches ? 'dark' : 'light'
+  })
+
+  function systemChanged() {
+    if (theme.value === 'system') {
+      apply()
+    }
+  }
 
   function init() {
-    const saved = localStorage.getItem('pm_theme') as Theme | null
-    if (saved === 'dark') {
-      theme.value = 'dark'
+    mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    mediaQuery.addEventListener('change', systemChanged)
+    const saved = localStorage.getItem('pm_theme') as ThemeMode | null
+    if (saved === 'light' || saved === 'dark' || saved === 'system') {
+      theme.value = saved
     }
     apply()
   }
 
   function toggle() {
-    theme.value = theme.value === 'light' ? 'dark' : 'light'
+    if (theme.value === 'system') {
+      theme.value = effectiveTheme.value
+    } else {
+      theme.value = theme.value === 'dark' ? 'light' : 'dark'
+    }
     localStorage.setItem('pm_theme', theme.value)
     apply()
   }
 
-  function set(t: Theme) {
+  function set(t: ThemeMode) {
     theme.value = t
     localStorage.setItem('pm_theme', t)
     apply()
   }
 
   function apply() {
-    document.documentElement.classList.toggle('dark', theme.value === 'dark')
+    document.documentElement.classList.toggle('dark', effectiveTheme.value === 'dark')
   }
 
-  return { theme, init, toggle, set, apply }
+  function cleanup() {
+    mediaQuery?.removeEventListener('change', systemChanged)
+  }
+
+  return { theme, effectiveTheme, init, toggle, set, apply, cleanup }
 })
