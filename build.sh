@@ -12,7 +12,7 @@ echo "=== Password Manager Build v$APP_VERSION ==="
 echo ">>> Building desktop app..."
 cd "$ROOT_DIR"
 npm run build
-npx tauri build 2>&1 | tail -5
+npx tauri build 2>&1 || { echo "!!! Tauri build failed"; exit 1; }
 
 # Step 2: Locate installer
 INSTALLER=""
