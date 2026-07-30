@@ -11,7 +11,14 @@
         </div>
       </header>
 
-      <div v-if="loading" class="loading">{{ i18n.t('list.loading') }}</div>
+      <div v-if="loading" class="skeleton-detail">
+        <div class="detail-card">
+          <div v-for="n in 6" :key="n" class="skeleton-row">
+            <div class="skeleton-label"></div>
+            <div class="skeleton-value"></div>
+          </div>
+        </div>
+      </div>
       <div v-else-if="!entry" class="empty">{{ i18n.t('detail.not_found') }}</div>
       <div v-else class="detail-content">
         <div class="detail-card">
@@ -34,7 +41,10 @@
           </div>
           <div class="detail-row">
             <label>{{ i18n.t('detail.username') }}</label>
-            <div class="value">{{ entry.username }}</div>
+            <div class="value">
+              {{ entry.username }}
+              <button v-if="entry.username" class="btn-copy" @click="copyToClipboard(entry.username)">&#128203;</button>
+            </div>
           </div>
           <div class="detail-row">
             <label>{{ i18n.t('detail.autofill_mode') }}</label>
@@ -56,6 +66,7 @@
               <button class="btn-reveal" @click="revealPassword">
                 {{ showPassword ? i18n.t('detail.hide') : i18n.t('detail.show') }}
               </button>
+              <button class="btn-copy" @click="copyToClipboard(entry.password)">&#128203;</button>
             </div>
           </div>
           <div v-if="emailsInfo.length > 0" class="detail-row">
@@ -161,6 +172,20 @@ const nextTotp = ref('')
 const remaining = ref(30)
 const totpProgress = ref(100)
 let totpTimer: ReturnType<typeof setInterval> | null = null
+let clipboardTimer: ReturnType<typeof setTimeout> | null = null
+
+async function copyToClipboard(value: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    toast.success(i18n.t('toast.copied'))
+    if (clipboardTimer) clearTimeout(clipboardTimer)
+    clipboardTimer = setTimeout(async () => {
+      try {
+        await navigator.clipboard.writeText('')
+      } catch { /* ignore */ }
+    }, 30000)
+  } catch { /* ignore */ }
+}
 
 const emailsInfo = computed<EmailInfo[]>(() => parseEmails(entry.value?.emails_raw ?? null))
 
@@ -259,11 +284,13 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (totpTimer) clearInterval(totpTimer)
+  if (clipboardTimer) clearTimeout(clipboardTimer)
 })
 
 async function handleToggleFav() {
   await store.toggleFavorite(route.params.id as string)
   entry.value.favorite = !entry.value.favorite
+  toast.success(i18n.t(entry.value.favorite ? 'toast.fav_on' : 'toast.fav_off'))
 }
 
 async function handleDelete() {
@@ -275,6 +302,7 @@ async function handleDelete() {
   })
   if (!ok) return
   await store.deleteEntry(route.params.id as string)
+  toast.success(i18n.t('toast.deleted'))
   router.push('/list')
 }
 
@@ -308,6 +336,12 @@ async function refreshEntry() {
 .btn-reveal:hover { border-color: var(--primary); }
 .btn-fav { padding: 0.25rem 0.5rem; font-size: 0.8125rem; background: none; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; white-space: nowrap; color: inherit; }
 .btn-fav:hover { border-color: var(--primary); color: var(--primary); }
+.btn-copy {
+  padding: 0.25rem 0.375rem; font-size: 0.75rem; background: none;
+  border: 1px solid var(--border); border-radius: 4px; cursor: pointer;
+  color: var(--text-secondary); line-height: 1;
+}
+.btn-copy:hover { border-color: var(--primary); color: var(--primary); }
 .email-line { font-size: 0.875rem; line-height: 1.6; }
 .badge-primary { display: inline-block; font-size: 0.625rem; background: var(--primary); color: #fff; padding: 0.0625rem 0.375rem; border-radius: 3px; margin-left: 0.25rem; vertical-align: middle; }
 .totp-row { display: flex; align-items: flex-start; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
@@ -323,4 +357,9 @@ async function refreshEntry() {
 .url-link { color: var(--primary); text-decoration: none; }
 .url-link:hover { text-decoration: underline; }
 .totp-actions { flex-shrink: 0; }
+.skeleton-detail { padding: 1.5rem; }
+.skeleton-row { display: flex; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); align-items: center; }
+.skeleton-label { width: 120px; height: 14px; border-radius: 4px; flex-shrink: 0; background: linear-gradient(90deg, var(--border) 25%, var(--hover-bg) 50%, var(--border) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+.skeleton-value { flex: 1; height: 14px; border-radius: 4px; background: linear-gradient(90deg, var(--border) 25%, var(--hover-bg) 50%, var(--border) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 </style>
