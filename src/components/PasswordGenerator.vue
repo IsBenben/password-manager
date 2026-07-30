@@ -119,8 +119,9 @@ h2 { margin: 0 0 1.25rem; }
 .gen-input:focus { outline: none; border-color: var(--primary); }
 .btn-copy {
   padding: 0.5rem 0.75rem; background: var(--hover-bg); border: 1px solid var(--border);
-  border-radius: 6px; cursor: pointer; font-size: 0.8125rem; white-space: nowrap;
+  border-radius: 6px; cursor: pointer; font-size: 0.8125rem; white-space: nowrap; color: inherit;
 }
+.btn-copy:hover { border-color: var(--primary); color: var(--primary); }
 .gen-controls { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
 .field label { font-size: 0.875rem; font-weight: 500; }
 .field input[type="range"] { width: 100%; }

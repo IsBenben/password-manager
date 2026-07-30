@@ -1,6 +1,6 @@
 use crate::{
     git_sync::GitSync,
-    models::{Config, NewEntry, PasswordEntry},
+    models::{CategoryInfo, Config, NewEntry, PasswordEntry},
     storage::Storage,
 };
 use std::sync::{Arc, Mutex};
@@ -14,10 +14,27 @@ pub struct AppData {
 #[tauri::command]
 pub(crate) fn list_entries(
     search: Option<String>,
+    category: Option<String>,
+    favorite: Option<bool>,
     state: State<AppData>,
 ) -> Result<Vec<PasswordEntry>, String> {
     let storage = state.storage.lock().map_err(|e| e.to_string())?;
-    Ok(storage.list_entries(search.as_deref()))
+    Ok(storage.list_entries(search.as_deref(), category.as_deref(), favorite))
+}
+
+#[tauri::command]
+pub(crate) fn list_categories(state: State<AppData>) -> Result<Vec<CategoryInfo>, String> {
+    let storage = state.storage.lock().map_err(|e| e.to_string())?;
+    Ok(storage.list_categories())
+}
+
+#[tauri::command]
+pub(crate) fn toggle_favorite(
+    id: String,
+    state: State<AppData>,
+) -> Result<bool, String> {
+    let mut storage = state.storage.lock().map_err(|e| e.to_string())?;
+    storage.toggle_favorite(&id)
 }
 
 #[tauri::command]

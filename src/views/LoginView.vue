@@ -16,6 +16,7 @@
             @input="checkNonAscii"
           />
           <p v-if="nonAsciiWarning" class="warning">{{ nonAsciiWarning }}</p>
+          <PasswordStrengthMeter v-if="isSetup" :password="password" />
         </div>
 
         <div v-if="isSetup" class="field">
@@ -43,6 +44,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import { useI18nStore } from '../stores/i18nStore'
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter.vue'
 
 const router = useRouter()
 const auth = useAuthStore()

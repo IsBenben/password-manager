@@ -114,7 +114,8 @@ function fillCredentials(username, password, totp) {
   }
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id) return;
   if (message.type === 'FILL_CREDENTIALS') {
     fillCredentials(message.username, message.password, message.totp);
     sendResponse({ success: true });

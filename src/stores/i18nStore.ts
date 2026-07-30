@@ -42,8 +42,12 @@ export const useI18nStore = defineStore('i18n', () => {
     }
   }
 
-  function t(path: string): string {
-    return getNested(messages[lang.value], path)
+  function t(path: string, ...args: string[]): string {
+    let text = getNested(messages[lang.value], path)
+    args.forEach((arg, i) => {
+      text = text.replace(`{${i}}`, arg)
+    })
+    return text
   }
 
   return { lang, langLabel, setLang, toggleLang, initLang, t }

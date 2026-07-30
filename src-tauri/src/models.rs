@@ -20,6 +20,10 @@ pub struct PasswordEntry {
     pub updated_at: u64,
     #[serde(default = "default_autofill_mode")]
     pub autofill_mode: String,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub favorite: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +37,16 @@ pub struct NewEntry {
     pub note: String,
     #[serde(default = "default_autofill_mode")]
     pub autofill_mode: String,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub favorite: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CategoryInfo {
+    pub name: String,
+    pub count: u32,
 }
 
 fn default_autofill_mode() -> String {
