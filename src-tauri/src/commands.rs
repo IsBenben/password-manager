@@ -158,6 +158,99 @@ pub(crate) fn export_json(path: String, state: State<AppData>) -> Result<String,
 }
 
 #[tauri::command]
+pub(crate) fn export_csv(path: String, password: String, state: State<AppData>) -> Result<String, String> {
+    use zeroize::Zeroize;
+
+    let storage = state.storage.lock().map_err(|e| e.to_string())?;
+    let raw = storage.list_entries(None, None, None);
+    let dest = PathBuf::from(&path);
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    let mut wtr = csv::Writer::from_path(&dest).map_err(|e| format!("Failed to create CSV: {}", e))?;
+    wtr.write_record(["site_url", "username", "password", "category", "favorite", "note", "twofa_secret", "phone"])
+        .map_err(|e| format!("CSV write error: {}", e))?;
+
+    for entry in &raw {
+        let decrypted = storage.get_entry(&entry.id, &password).unwrap_or_else(|_| entry.clone());
+        let mut pwd = decrypted.password;
+        let fav_str = if decrypted.favorite { "true" } else { "false" };
+        wtr.write_record([
+            decrypted.site_url.as_str(),
+            decrypted.username.as_str(),
+            pwd.as_str(),
+            decrypted.category.as_str(),
+            fav_str,
+            decrypted.note.as_str(),
+            decrypted.twofa_secret.as_deref().unwrap_or(""),
+            decrypted.phone.as_deref().unwrap_or(""),
+        ]).map_err(|e| format!("CSV write error: {}", e))?;
+        pwd.zeroize();
+    }
+
+    wtr.flush().map_err(|e| format!("CSV flush error: {}", e))?;
+    Ok(format!("Exported CSV to {}", path))
+}
+
+#[tauri::command]
+pub(crate) fn import_csv(path: String, password: String, state: State<AppData>) -> Result<String, String> {
+    let mut storage = state.storage.lock().map_err(|e| e.to_string())?;
+    storage.verify_password(&password)?;
+
+    let mut rdr = csv::ReaderBuilder::new()
+        .flexible(true)
+        .from_path(&PathBuf::from(&path))
+        .map_err(|e| format!("Failed to read CSV: {}", e))?;
+
+    let headers = rdr.headers().map_err(|e| format!("CSV header error: {}", e))?;
+    let is_bitwarden = headers.iter().any(|h| h == "login_uri" || h == "login_username");
+
+    let mut count = 0u32;
+    for result in rdr.records() {
+        let record = result.map_err(|e| format!("CSV parse error: {}", e))?;
+
+        let (site_url, username, field_password, category, favorite, note, twofa_secret, phone) = if is_bitwarden {
+            let uri = record.get(6).unwrap_or("");
+            let uname = record.get(7).unwrap_or("");
+            let p = record.get(8).unwrap_or("");
+            let cat = record.get(0).unwrap_or("");
+            let fav = record.get(1).unwrap_or("") == "1";
+            let notes = record.get(4).unwrap_or("");
+            let totp = record.get(9).unwrap_or("");
+            (uri, uname, p, cat, fav, notes, totp, "")
+        } else {
+            let uri = record.get(0).unwrap_or("");
+            let uname = record.get(1).unwrap_or("");
+            let p = record.get(2).unwrap_or("");
+            let cat = record.get(3).unwrap_or("");
+            let fav = record.get(4).unwrap_or("") == "true";
+            let notes = record.get(5).unwrap_or("");
+            let totp = record.get(6).unwrap_or("");
+            let ph = record.get(7).unwrap_or("");
+            (uri, uname, p, cat, fav, notes, totp, ph)
+        };
+
+        let entry = NewEntry {
+            site_url: site_url.to_string(),
+            username: username.to_string(),
+            password: field_password.to_string(),
+            emails_raw: None,
+            phone: if phone.is_empty() { None } else { Some(phone.to_string()) },
+            twofa_secret: if twofa_secret.is_empty() { None } else { Some(twofa_secret.to_string()) },
+            note: note.to_string(),
+            autofill_mode: "default".to_string(),
+            category: category.to_string(),
+            favorite,
+        };
+        storage.add_entry(entry, &password)?;
+        count += 1;
+    }
+
+    Ok(format!("Imported {} entries from CSV", count))
+}
+
+#[tauri::command]
 pub(crate) fn import_json(path: String, password: String, state: State<AppData>) -> Result<String, String> {
     let content = std::fs::read_to_string(&PathBuf::from(&path))
         .map_err(|e| format!("Failed to read import file: {}", e))?;

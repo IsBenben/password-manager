@@ -106,19 +106,25 @@
 
         <section class="setting-section">
           <h3>{{ i18n.t('settings.import_export') }}</h3>
-          <form @submit.prevent="handleExport" class="setting-form">
+          <form class="setting-form">
             <div class="field">
               <label>{{ i18n.t('settings.export_path') }}</label>
               <input v-model="exportPath" type="text" :placeholder="i18n.t('settings.export_placeholder')" />
             </div>
-            <button type="submit" class="btn-secondary">{{ i18n.t('settings.export_btn') }}</button>
+            <div class="btn-group">
+              <button type="button" class="btn-secondary" @click="handleExport('json')">{{ i18n.t('settings.export_json') }}</button>
+              <button type="button" class="btn-secondary" @click="handleExport('csv')">{{ i18n.t('settings.export_csv') }}</button>
+            </div>
           </form>
-          <form @submit.prevent="handleImport" class="setting-form" style="margin-top: 1rem;">
+          <form class="setting-form" style="margin-top: 1rem;">
             <div class="field">
               <label>{{ i18n.t('settings.import_path') }}</label>
               <input v-model="importPath" type="text" :placeholder="i18n.t('settings.import_placeholder')" />
             </div>
-            <button type="submit" class="btn-secondary">{{ i18n.t('settings.import_btn') }}</button>
+            <div class="btn-group">
+              <button type="button" class="btn-secondary" @click="handleImport('json')">{{ i18n.t('settings.import_json') }}</button>
+              <button type="button" class="btn-secondary" @click="handleImport('csv')">{{ i18n.t('settings.import_csv') }}</button>
+            </div>
           </form>
         </section>
 
@@ -292,20 +298,23 @@ async function handleSessionConfig() {
   }
 }
 
-async function handleExport() {
+async function handleExport(fmt: 'json' | 'csv') {
   if (!exportPath.value) {
     toast.error(i18n.t('settings.error_export_path'))
     return
   }
   try {
-    const result: string = await invoke('export_json', { path: exportPath.value })
+    const cmd = fmt === 'csv' ? 'export_csv' : 'export_json'
+    const args: Record<string, unknown> = { path: exportPath.value }
+    if (fmt === 'csv') args.password = auth.currentPassword
+    const result: string = await invoke(cmd, args)
     toast.success(result)
   } catch (e: any) {
     toast.error(typeof e === 'string' ? e : i18n.t('settings.error_export'))
   }
 }
 
-async function handleImport() {
+async function handleImport(fmt: 'json' | 'csv') {
   if (!importPath.value) {
     toast.error(i18n.t('settings.error_import_path'))
     return
@@ -319,7 +328,8 @@ async function handleImport() {
   })
   if (!pwd) return
   try {
-    const result: string = await invoke('import_json', { path: importPath.value, password: pwd })
+    const cmd = fmt === 'csv' ? 'import_csv' : 'import_json'
+    const result: string = await invoke(cmd, { path: importPath.value, password: pwd })
     toast.success(result)
     await passwordStore.fetchEntries()
   } catch (e: any) {

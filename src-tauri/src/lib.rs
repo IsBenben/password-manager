@@ -110,6 +110,8 @@ pub fn run() {
             commands::generate_password,
             commands::export_json,
             commands::import_json,
+            commands::export_csv,
+            commands::import_csv,
             commands::list_categories,
             commands::toggle_favorite,
         ])
