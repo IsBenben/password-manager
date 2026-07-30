@@ -90,7 +90,6 @@
               <label>{{ i18n.t('settings.export_path') }}</label>
               <input v-model="exportPath" type="text" :placeholder="i18n.t('settings.export_placeholder')" />
             </div>
-            <p v-if="exportMsg" :class="exportMsg.startsWith('Error') ? 'error' : 'success'">{{ exportMsg }}</p>
             <button type="submit" class="btn-secondary">{{ i18n.t('settings.export_btn') }}</button>
           </form>
           <form @submit.prevent="handleImport" class="setting-form" style="margin-top: 1rem;">
@@ -98,7 +97,6 @@
               <label>{{ i18n.t('settings.import_path') }}</label>
               <input v-model="importPath" type="text" :placeholder="i18n.t('settings.import_placeholder')" />
             </div>
-            <p v-if="importMsg" :class="importMsg.startsWith('Error') ? 'error' : 'success'">{{ importMsg }}</p>
             <button type="submit" class="btn-secondary">{{ i18n.t('settings.import_btn') }}</button>
           </form>
         </section>
@@ -122,6 +120,8 @@ import { useThemeStore } from '../stores/themeStore'
 import { usePasswordStore } from '../stores/passwordStore'
 import { useI18nStore } from '../stores/i18nStore'
 import AppSidebar from '../components/AppSidebar.vue'
+import { showPrompt } from '../stores/dialogStore'
+import { useToast } from '../stores/toastStore'
 import { invoke } from '@tauri-apps/api/core'
 
 const router = useRouter()
@@ -130,6 +130,7 @@ const configStore = useConfigStore()
 const passwordStore = usePasswordStore()
 const i18n = useI18nStore()
 const themeStore = useThemeStore()
+const toast = useToast()
 
 const themeMode = ref(themeStore.theme)
 function updateTheme() {
@@ -171,8 +172,6 @@ const sessionSuccess = ref('')
 
 const exportPath = ref('')
 const importPath = ref('')
-const exportMsg = ref('')
-const importMsg = ref('')
 
 onMounted(async () => {
   if (!auth.checkSession()) {
@@ -268,33 +267,37 @@ async function handleSessionConfig() {
 }
 
 async function handleExport() {
-  exportMsg.value = ''
   if (!exportPath.value) {
-    exportMsg.value = 'Error: ' + i18n.t('settings.error_export_path')
+    toast.error(i18n.t('settings.error_export_path'))
     return
   }
   try {
     const result: string = await invoke('export_json', { path: exportPath.value })
-    exportMsg.value = result
+    toast.success(result)
   } catch (e: any) {
-    exportMsg.value = 'Error: ' + (typeof e === 'string' ? e : i18n.t('settings.error_export'))
+    toast.error(typeof e === 'string' ? e : i18n.t('settings.error_export'))
   }
 }
 
 async function handleImport() {
-  importMsg.value = ''
   if (!importPath.value) {
-    importMsg.value = 'Error: ' + i18n.t('settings.error_import_path')
+    toast.error(i18n.t('settings.error_import_path'))
     return
   }
-  const pwd = prompt(i18n.t('settings.prompt_import_password'))
+  const pwd = await showPrompt({
+    title: i18n.t('settings.prompt_import_password'),
+    message: '',
+    inputType: 'password',
+    confirmText: i18n.t('dialog.confirm'),
+    cancelText: i18n.t('dialog.cancel'),
+  })
   if (!pwd) return
   try {
     const result: string = await invoke('import_json', { path: importPath.value, password: pwd })
-    importMsg.value = result
+    toast.success(result)
     await passwordStore.fetchEntries()
   } catch (e: any) {
-    importMsg.value = 'Error: ' + (typeof e === 'string' ? e : i18n.t('settings.error_import'))
+    toast.error(typeof e === 'string' ? e : i18n.t('settings.error_import'))
   }
 }
 </script>
