@@ -4,6 +4,7 @@ mod git_sync;
 mod http_service;
 mod models;
 mod storage;
+mod wordlist;
 
 use commands::AppData;
 use std::sync::{Arc, Mutex};
@@ -114,6 +115,7 @@ pub fn run() {
             commands::import_csv,
             commands::list_categories,
             commands::toggle_favorite,
+            commands::generate_passphrase,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

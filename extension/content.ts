@@ -160,3 +160,20 @@ chrome.runtime.onMessage.addListener((
 if (findPasswordFields()) {
   chrome.runtime.sendMessage({ type: 'PASSWORD_FIELD_DETECTED', url: window.location.href });
 }
+
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+    e.preventDefault();
+    chrome.runtime.sendMessage({ type: 'AUTO_FILL' });
+  }
+});
+
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+    e.preventDefault();
+    chrome.runtime.sendMessage({ type: 'FILL_TARGET', entries: undefined, fillType: 'username' });
+    setTimeout(() => {
+      chrome.runtime.sendMessage({ type: 'FILL_TARGET', entries: undefined, fillType: 'password' });
+    }, 100);
+  }
+});

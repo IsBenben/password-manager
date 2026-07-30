@@ -110,24 +110,27 @@ impl Storage {
         if self.data.entries.is_empty() {
             return Ok(salt);
         }
-        let test_entry = &self.data.entries[0];
-        let fields = [
-            test_entry.password.as_str(),
-            test_entry.emails_raw.as_deref().unwrap_or(""),
-            test_entry.phone.as_deref().unwrap_or(""),
-            test_entry.twofa_secret.as_deref().unwrap_or(""),
-        ];
-        let any_encrypted = fields.iter().any(|f| !f.is_empty());
-        if any_encrypted {
-            for field in fields {
-                if !field.is_empty() {
-                    if crypto::decrypt_field(field, password).is_ok() {
-                        return Ok(salt);
+        // Scan all entries for any non-empty encrypted field to verify against
+        for entry in &self.data.entries {
+            let fields = [
+                entry.password.as_str(),
+                entry.emails_raw.as_deref().unwrap_or(""),
+                entry.phone.as_deref().unwrap_or(""),
+                entry.twofa_secret.as_deref().unwrap_or(""),
+            ];
+            let any_encrypted = fields.iter().any(|f| !f.is_empty());
+            if any_encrypted {
+                for field in fields {
+                    if !field.is_empty() {
+                        if crypto::decrypt_field(field, password).is_ok() {
+                            return Ok(salt);
+                        }
+                        return Err("Incorrect password".into());
                     }
-                    return Err("Incorrect password".into());
                 }
             }
         }
+        // No encrypted fields found at all — accept any password
         Ok(salt)
     }
 
@@ -244,6 +247,14 @@ impl Storage {
     }
 
     pub fn add_entry(&mut self, entry: NewEntry, password: &str) -> Result<(), String> {
+        self.verify_password(password)?;
+        if entry.site_url.trim().is_empty()
+            && entry.username.trim().is_empty()
+            && entry.emails_raw.as_deref().unwrap_or("").trim().is_empty()
+            && entry.phone.as_deref().unwrap_or("").trim().is_empty()
+        {
+            return Err("At least one field (site_url, username, email, or phone) must be non-empty".into());
+        }
         let salt = self.get_salt_bytes()?;
         let now = Utc::now().timestamp() as u64;
         let new_entry = PasswordEntry {
@@ -277,6 +288,7 @@ impl Storage {
         entry: NewEntry,
         password: &str,
     ) -> Result<(), String> {
+        self.verify_password(password)?;
         let salt = self.get_salt_bytes()?;
         let now = Utc::now().timestamp() as u64;
         let existing = self

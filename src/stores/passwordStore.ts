@@ -121,6 +121,20 @@ export const usePasswordStore = defineStore('password', () => {
     })
   }
 
+  async function generatePassphrase(
+    wordCount?: number,
+    separator?: string,
+    capitalize?: boolean,
+    appendNumber?: boolean,
+  ): Promise<string> {
+    return await invoke('generate_passphrase', {
+      wordCount: wordCount || null,
+      separator: separator !== undefined ? separator : null,
+      capitalize: capitalize ?? null,
+      appendNumber: appendNumber ?? null,
+    })
+  }
+
   return {
     entries,
     categories,
@@ -136,5 +150,6 @@ export const usePasswordStore = defineStore('password', () => {
     changeMasterPassword,
     generateTotp,
     generatePassword,
+    generatePassphrase,
   }
 })

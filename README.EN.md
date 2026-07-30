@@ -7,18 +7,27 @@ A cross-platform desktop password manager built with Tauri (Rust + Vue 3), featu
 - **AES-256-GCM Encryption** — All sensitive fields (password, email, phone, 2FA seed) are individually encrypted with PBKDF2-derived keys + AES-256-GCM, each with a random IV
 - **Master Password Protection** — Viewing sensitive data requires the master password; session timeout is configurable (default 30 min)
 - **Password Strength Validation** — Master password must be ≥12 characters with uppercase, lowercase, digit, and symbol
-- **Search & Filter** — Fuzzy search by site URL, username, or note
+- **Search & Sort** — Fuzzy search by site URL, username, or note; sort by name, date, or site (favorites first)
 - **Masked Display** — Sensitive fields are hidden by default; reveal requires authentication
+- **Quick Copy** — One-click copy username/password to clipboard, auto-cleared after 30 seconds
 - **TOTP Code Generator** — Built-in TOTP generator (RFC 6238) with countdown bar and next-code preview
 - **Git Cloud Backup** — One-click Push/Pull sync to a private Git repository
-- **Manual Import/Export** — Export encrypted data as JSON to any location, or import from JSON files
-- **Browser Extension** — Detects password fields and fills username/password/TOTP with one click; supports GitHub / PyPI 2FA
+- **Import/Export** — Supports JSON and CSV formats, compatible with Bitwarden CSV
+- **Auto-backup Before Import** — Automatically backs up current data to `.json.bak` before JSON import
+- **Browser Extension** — Detects password fields and fills username/password/TOTP with one click
+- **Extension Right-click Menu** — Right-click any input → "Fill Username" / "Fill Password"
+- **Extension Shortcut** — Ctrl+Shift+L to auto-fill credentials for the current site
 - **Local HTTP API** — Extension communicates with the desktop app via `127.0.0.1:33445`
+- **Password Generator** — Random passwords (custom length/character sets) and readable passphrases (2-10 words, capitalize/append number/custom separator)
+- **Keyboard Shortcuts** — Ctrl+F search, Ctrl+N new entry, Esc close modal
+- **Collapsible Sidebar** — Left navigation collapses to a narrow strip, freeing reading space
+- **Skeleton Loading** — Animated skeleton placeholders during list/detail loading, not plain text
 - **Custom Font** — Switch between system fonts or set a custom font family
 - **Multi-language** — English / Chinese real-time switching
-- **Password Generator** — Customizable length, character sets, and exclusion of confusing characters
 - **Multi-email Support** — Each entry supports multiple emails with a primary designation
 - **Autofill Mode** — Choose what to fill as the username: the stored username, primary email, phone number, or nothing
+- **Dark Mode** — Light/dark/system-follow themes with customizable accent color
+- **Audit Logging** — Sensitive operations (add/edit/delete/password change/import) are logged
 
 ## Tech Stack
 
@@ -52,6 +61,8 @@ Data file location: `~/.password-manager/data.json`
       "twofa_secret": "<base64 nonce+ciphertext+tag>",
       "note": "plaintext note",
       "autofill_mode": "default",
+      "category": "Work",
+      "favorite": false,
       "created_at": 1700000000,
       "updated_at": 1700000000
     }
@@ -139,18 +150,26 @@ password-manager/
 │   ├── main.ts                   # Entry point
 │   ├── App.vue                   # Root component
 │   ├── router/index.ts           # Route configuration
-│   ├── stores/                   # Pinia state management
+│   ├── stores/                   # Pinia + reactive modules
 │   │   ├── authStore.ts          # Authentication & session
 │   │   ├── passwordStore.ts      # Password CRUD
-│   │   └── configStore.ts        # Configuration
+│   │   ├── configStore.ts        # Configuration
+│   │   ├── themeStore.ts         # Dark mode & accent color
+│   │   ├── i18nStore.ts          # Internationalization
+│   │   ├── dialogStore.ts        # Confirm/prompt dialog
+│   │   └── toastStore.ts         # Toast notifications
 │   ├── views/
 │   │   ├── LoginView.vue         # Login / initialization
-│   │   ├── PasswordListView.vue  # Password list
-│   │   ├── PasswordDetailView.vue# Detail view
+│   │   ├── PasswordListView.vue  # Password list (search, sort, shortcuts)
+│   │   ├── PasswordDetailView.vue# Detail view (copy, TOTP)
 │   │   └── SettingsView.vue      # Settings page
 │   └── components/
+│       ├── AppSidebar.vue        # Collapsible sidebar
+│       ├── ConfirmDialog.vue     # Reusable confirm/prompt dialog
+│       ├── Toast.vue             # Toast notification container
 │       ├── PasswordForm.vue      # Add / edit form
-│       └── PasswordGenerator.vue # Password generator
+│       ├── PasswordGenerator.vue # Password/passphrase generator
+│       └── PasswordStrengthMeter.vue # Password strength indicator
 │
 ├── src-tauri/                    # Rust Backend
 │   └── src/
@@ -160,15 +179,19 @@ password-manager/
 │       ├── crypto.rs             # Encryption module
 │       ├── storage.rs            # Storage layer
 │       ├── commands.rs           # Tauri commands
+│       ├── wordlist.rs           # Passphrase word list (~1500 words)
 │       ├── git_sync.rs           # Git sync
 │       └── http_service.rs       # HTTP service
 │
 ├── extension/                    # Chrome Extension
 │   ├── manifest.json             # Manifest V3
-│   ├── background.js             # Service Worker
-│   ├── content.js                # Content script
+│   ├── background.js             # Service Worker (context menus, message routing)
+│   ├── content.js                # Content script (input tracking, auto-fill)
 │   ├── popup.html                # Popup window
 │   └── popup.js                  # Popup logic
+│
+├── scripts/                      # Utility scripts
+│   └── check-i18n.mjs            # i18n coverage checker
 │
 └── package.json
 ```
@@ -179,9 +202,11 @@ Tauri IPC commands (`#[tauri::command]`):
 
 | Command | Parameters | Description |
 |---------|-----------|-------------|
-| `list_entries` | `search?` | Fuzzy search by site/note |
+| `list_entries` | `search?, category?, favorite?` | Fuzzy search by site/note, filter by category/favorite |
+| `list_categories` | - | List all categories with counts |
+| `toggle_favorite` | `id` | Toggle favorite status |
 | `get_entry` | `id, password` | Get single entry with decrypted fields |
-| `add_entry` | `entry, password` | Add a new password entry |
+| `add_entry` | `entry, password` | Add a new entry (validates password and required fields) |
 | `edit_entry` | `id, entry, password` | Edit an existing entry |
 | `delete_entry` | `id` | Delete an entry |
 | `change_master_password` | `old, new` | Change master password and re-encrypt all data |
@@ -193,8 +218,11 @@ Tauri IPC commands (`#[tauri::command]`):
 | `git_pull` | - | Pull from Git |
 | `generate_totp` | `secret, step_offset?` | Generate TOTP code |
 | `generate_password` | `length, use_upper, use_lower, use_digits, use_symbols, exclude_confusing` | Generate random password |
+| `generate_passphrase` | `word_count?, separator?, capitalize?, append_number?` | Generate readable passphrase |
 | `export_json` | `path` | Export encrypted data to a file path |
-| `import_json` | `path, password` | Import encrypted data from a file path |
+| `export_csv` | `path, password` | Export as CSV (Bitwarden-compatible) |
+| `import_json` | `path, password` | Import from JSON file (auto-backup before overwrite) |
+| `import_csv` | `path, password` | Import from CSV (auto-detects Bitwarden format) |
 
 Extension HTTP API:
 
@@ -209,8 +237,18 @@ Extension HTTP API:
 2. **Field Encryption**: AES-256-GCM, each sensitive field uses a unique 12-byte random nonce
 3. **Storage Format**: `salt(16B) + nonce(12B) + ciphertext + tag(16B)`, all Base64-encoded
 4. **Session Management**: Frontend clears decrypted data after use; Rust uses `zeroize` for memory sanitization; session timeout is configurable
-5. **Brute Force Protection**: Delays on failed verification, configurable session timeout
+5. **Brute Force Protection**: Delays on failed verification, salt rotation on password change
 6. **Transport Security**: HTTP service binds to `127.0.0.1` only, not exposed externally
+7. **Audit Logging**: Sensitive operations (add/edit/delete/password change/import) are logged
+
+## Development Roadmap
+
+- [x] Phase 1: Core Backend (Rust) — Data model, encryption, CRUD, Git sync
+- [x] Phase 2: Desktop Frontend (Vue) — List, search, detail, settings
+- [x] Phase 3: HTTP Service & Extension — Local API, browser auto-fill
+- [x] Phase 4: Session config, import/export, dark mode, CSV, Toast, custom dialogs
+- [x] Phase 5: Right-click menu, shortcuts, sorting, skeleton screens, audit log, clipboard mgmt, passphrases
+- [ ] Phase 6: Integration testing & optimization — E2E tests, performance, security audit
 
 ## License
 
