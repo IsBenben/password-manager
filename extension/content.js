@@ -1,5 +1,13 @@
 let customUsernameSelector = '';
 let customPasswordSelector = '';
+let targetInput = null;
+
+document.addEventListener('contextmenu', (e) => {
+  const target = e.target;
+  targetInput = target instanceof HTMLInputElement
+    ? target
+    : target.closest('input');
+});
 
 function setNativeValue(input, value) {
   const nativeSetter = Object.getOwnPropertyDescriptor(
@@ -128,8 +136,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     customPasswordSelector = message.passwordSelector || '';
     sendResponse({ success: true });
   }
+  if (message.type === 'FILL_TARGET') {
+    const entry = message.entries?.[0];
+    if (entry && targetInput) {
+      const value = message.fillType === 'password' ? entry.password : entry.username;
+      if (value) {
+        targetInput.focus();
+        setNativeValue(targetInput, value);
+      }
+    }
+    sendResponse({ success: true });
+  }
 });
 
 if (findPasswordFields()) {
   chrome.runtime.sendMessage({ type: 'PASSWORD_FIELD_DETECTED', url: window.location.href });
 }
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+    e.preventDefault();
+    chrome.runtime.sendMessage({ type: 'AUTO_FILL' });
+  }
+});

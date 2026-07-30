@@ -1,9 +1,12 @@
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ collapsed }">
     <div class="sidebar-header">
-      <h2>{{ i18n.t('app.title') }}</h2>
+      <h2 v-show="!collapsed">{{ i18n.t('app.title') }}</h2>
+      <button class="btn-collapse" @click="collapsed = !collapsed" :title="collapsed ? 'Expand' : 'Collapse'">
+        {{ collapsed ? '&#9654;' : '&#9664;' }}
+      </button>
     </div>
-    <nav class="sidebar-nav">
+    <nav v-show="!collapsed" class="sidebar-nav">
       <a class="nav-item" :class="{ active: activeFilter == null }" @click="$emit('filter')">
         <span class="nav-icon">&#128273;</span> {{ i18n.t('nav.all_passwords') }}
       </a>
@@ -28,13 +31,14 @@
         <span class="nav-icon">&#9881;</span> {{ i18n.t('nav.settings') }}
       </router-link>
     </nav>
-    <div class="sidebar-footer">
+    <div v-show="!collapsed" class="sidebar-footer">
       <button class="btn-logout" @click="lock">{{ i18n.t('nav.lock') }}</button>
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePasswordStore } from '../stores/passwordStore'
 import { useAuthStore } from '../stores/authStore'
@@ -52,6 +56,7 @@ const router = useRouter()
 const store = usePasswordStore()
 const auth = useAuthStore()
 const i18n = useI18nStore()
+const collapsed = ref(false)
 
 function lock() {
   auth.clearSession()
@@ -63,10 +68,17 @@ function lock() {
 .sidebar {
   width: 240px; background: var(--card-bg);
   border-right: 1px solid var(--border); display: flex;
-  flex-direction: column; flex-shrink: 0;
+  flex-direction: column; flex-shrink: 0; transition: width 0.2s;
 }
-.sidebar-header { padding: 1.25rem; border-bottom: 1px solid var(--border); }
-.sidebar-header h2 { margin: 0; font-size: 1.125rem; }
+.sidebar.collapsed { width: 48px; }
+.sidebar-header { display: flex; align-items: center; gap: 0.25rem; padding: 1rem; border-bottom: 1px solid var(--border); }
+.sidebar-header h2 { margin: 0; font-size: 1.125rem; flex: 1; }
+.btn-collapse {
+  width: 24px; height: 24px; padding: 0; border: 1px solid var(--border);
+  border-radius: 4px; background: none; cursor: pointer; font-size: 0.625rem;
+  color: var(--text-secondary); line-height: 1;
+}
+.btn-collapse:hover { border-color: var(--primary); color: var(--primary); }
 .sidebar-nav { flex: 1; padding: 0.75rem; overflow-y: auto; }
 .nav-item {
   display: flex; align-items: center; gap: 0.5rem;

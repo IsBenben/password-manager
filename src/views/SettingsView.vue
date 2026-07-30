@@ -23,7 +23,6 @@
               <input v-model="changePwd.confirm" type="password" />
             </div>
             <p v-if="pwdError" class="error">{{ pwdError }}</p>
-            <p v-if="pwdSuccess" class="success">{{ pwdSuccess }}</p>
             <button type="submit" class="btn-primary" :disabled="changingPwd">
               {{ changingPwd ? i18n.t('settings.changing') : i18n.t('settings.change_password') }}
             </button>
@@ -38,7 +37,6 @@
               <input v-model="gitRemote" type="text" :placeholder="i18n.t('settings.git_remote_placeholder')" />
             </div>
             <p v-if="gitError" class="error">{{ gitError }}</p>
-            <p v-if="gitSuccess" class="success">{{ gitSuccess }}</p>
             <div class="btn-group">
               <button type="submit" class="btn-primary">{{ i18n.t('settings.save_config') }}</button>
               <button type="button" class="btn-secondary" @click="handleGitPush">{{ i18n.t('settings.push_to_git') }}</button>
@@ -99,26 +97,31 @@
               <input v-model.number="sessionTimeout" type="number" min="1" max="1440" />
             </div>
             <p v-if="sessionError" class="error">{{ sessionError }}</p>
-            <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
             <button type="submit" class="btn-primary">{{ i18n.t('settings.save_session') }}</button>
           </form>
         </section>
 
         <section class="setting-section">
           <h3>{{ i18n.t('settings.import_export') }}</h3>
-          <form @submit.prevent="handleExport" class="setting-form">
+          <form class="setting-form">
             <div class="field">
               <label>{{ i18n.t('settings.export_path') }}</label>
               <input v-model="exportPath" type="text" :placeholder="i18n.t('settings.export_placeholder')" />
             </div>
-            <button type="submit" class="btn-secondary">{{ i18n.t('settings.export_btn') }}</button>
+            <div class="btn-group">
+              <button type="button" class="btn-secondary" @click="handleExport('json')">{{ i18n.t('settings.export_json') }}</button>
+              <button type="button" class="btn-secondary" @click="handleExport('csv')">{{ i18n.t('settings.export_csv') }}</button>
+            </div>
           </form>
-          <form @submit.prevent="handleImport" class="setting-form" style="margin-top: 1rem;">
+          <form class="setting-form" style="margin-top: 1rem;">
             <div class="field">
               <label>{{ i18n.t('settings.import_path') }}</label>
               <input v-model="importPath" type="text" :placeholder="i18n.t('settings.import_placeholder')" />
             </div>
-            <button type="submit" class="btn-secondary">{{ i18n.t('settings.import_btn') }}</button>
+            <div class="btn-group">
+              <button type="button" class="btn-secondary" @click="handleImport('json')">{{ i18n.t('settings.import_json') }}</button>
+              <button type="button" class="btn-secondary" @click="handleImport('csv')">{{ i18n.t('settings.import_csv') }}</button>
+            </div>
           </form>
         </section>
 
@@ -164,12 +167,14 @@ function setAccent(color: string) {
 }
 
 async function updateFont() {
+  if (fontFamily.value === configStore.config.font_family) return
   await configStore.updateConfig({
     git_remote: configStore.config.git_remote,
     font_family: fontFamily.value,
     session_timeout_minutes: configStore.config.session_timeout_minutes,
   })
   document.documentElement.style.setProperty('--app-font', fontFamily.value)
+  toast.success(i18n.t('settings.success_config'))
 }
 
 function navigateToList(cat?: string) {
@@ -184,17 +189,14 @@ function navigateToList(cat?: string) {
 
 const changePwd = ref({ old: '', new: '', confirm: '' })
 const pwdError = ref('')
-const pwdSuccess = ref('')
 const changingPwd = ref(false)
 
 const gitRemote = ref('')
 const fontFamily = ref('')
 const gitError = ref('')
-const gitSuccess = ref('')
 
 const sessionTimeout = ref(30)
 const sessionError = ref('')
-const sessionSuccess = ref('')
 
 const exportPath = ref('')
 const importPath = ref('')
@@ -211,7 +213,6 @@ onMounted(async () => {
 
 async function handleChangePassword() {
   pwdError.value = ''
-  pwdSuccess.value = ''
 
   if (changePwd.value.new !== changePwd.value.confirm) {
     pwdError.value = i18n.t('settings.error_match')
@@ -226,7 +227,7 @@ async function handleChangePassword() {
   try {
     await passwordStore.changeMasterPassword(changePwd.value.old, changePwd.value.new)
     auth.currentPassword = changePwd.value.new
-    pwdSuccess.value = i18n.t('settings.success_changed')
+    toast.success(i18n.t('settings.success_changed'))
     changePwd.value = { old: '', new: '', confirm: '' }
   } catch (e: any) {
     pwdError.value = typeof e === 'string' ? e : i18n.t('settings.error_change')
@@ -237,14 +238,14 @@ async function handleChangePassword() {
 
 async function handleGitConfig() {
   gitError.value = ''
-  gitSuccess.value = ''
+  if (gitRemote.value === configStore.config.git_remote) return
   try {
     await configStore.updateConfig({
       git_remote: gitRemote.value,
       font_family: configStore.config.font_family,
       session_timeout_minutes: configStore.config.session_timeout_minutes,
     })
-    gitSuccess.value = i18n.t('settings.success_config')
+    toast.success(i18n.t('settings.success_config'))
   } catch (e: any) {
     gitError.value = typeof e === 'string' ? e : i18n.t('settings.error_config')
   }
@@ -252,10 +253,9 @@ async function handleGitConfig() {
 
 async function handleGitPush() {
   gitError.value = ''
-  gitSuccess.value = ''
   try {
     const result: string = await invoke('git_push', { message: i18n.t('settings.git_commit_message') })
-    gitSuccess.value = result
+    toast.success(result)
   } catch (e: any) {
     gitError.value = typeof e === 'string' ? e : i18n.t('settings.push_failed')
   }
@@ -263,10 +263,9 @@ async function handleGitPush() {
 
 async function handleGitPull() {
   gitError.value = ''
-  gitSuccess.value = ''
   try {
     const result: string = await invoke('git_pull')
-    gitSuccess.value = result
+    toast.success(result)
   } catch (e: any) {
     gitError.value = typeof e === 'string' ? e : i18n.t('settings.pull_failed')
   }
@@ -274,11 +273,11 @@ async function handleGitPull() {
 
 async function handleSessionConfig() {
   sessionError.value = ''
-  sessionSuccess.value = ''
   if (sessionTimeout.value < 1 || sessionTimeout.value > 1440) {
     sessionError.value = i18n.t('settings.error_timeout_range')
     return
   }
+  if (sessionTimeout.value === configStore.config.session_timeout_minutes) return
   try {
     await configStore.updateConfig({
       git_remote: configStore.config.git_remote,
@@ -286,26 +285,29 @@ async function handleSessionConfig() {
       session_timeout_minutes: sessionTimeout.value,
     })
     auth.setSessionTimeout(sessionTimeout.value)
-    sessionSuccess.value = i18n.t('settings.success_session_timeout')
+    toast.success(i18n.t('settings.success_session_timeout'))
   } catch (e: any) {
     sessionError.value = typeof e === 'string' ? e : i18n.t('settings.error_session_save')
   }
 }
 
-async function handleExport() {
+async function handleExport(fmt: 'json' | 'csv') {
   if (!exportPath.value) {
     toast.error(i18n.t('settings.error_export_path'))
     return
   }
   try {
-    const result: string = await invoke('export_json', { path: exportPath.value })
-    toast.success(result)
+    const cmd = fmt === 'csv' ? 'export_csv' : 'export_json'
+    const args: Record<string, unknown> = { path: exportPath.value }
+    if (fmt === 'csv') args.password = auth.currentPassword
+    await invoke(cmd, args)
+    toast.success(i18n.t('toast.exported', exportPath.value))
   } catch (e: any) {
     toast.error(typeof e === 'string' ? e : i18n.t('settings.error_export'))
   }
 }
 
-async function handleImport() {
+async function handleImport(fmt: 'json' | 'csv') {
   if (!importPath.value) {
     toast.error(i18n.t('settings.error_import_path'))
     return
@@ -319,8 +321,10 @@ async function handleImport() {
   })
   if (!pwd) return
   try {
-    const result: string = await invoke('import_json', { path: importPath.value, password: pwd })
-    toast.success(result)
+    const cmd = fmt === 'csv' ? 'import_csv' : 'import_json'
+    const result: string = await invoke(cmd, { path: importPath.value, password: pwd })
+    const count = result.match(/\d+/)?.[0] || ''
+    toast.success(i18n.t('toast.imported', count))
     await passwordStore.fetchEntries()
   } catch (e: any) {
     toast.error(typeof e === 'string' ? e : i18n.t('settings.error_import'))

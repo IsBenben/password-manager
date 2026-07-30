@@ -5,7 +5,8 @@
   "description": "Auto-fill passwords from local password manager",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "contextMenus"
   ],
   "host_permissions": [
     "http://127.0.0.1:33445/*"

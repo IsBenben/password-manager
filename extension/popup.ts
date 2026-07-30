@@ -200,6 +200,7 @@ async function render(): Promise<void> {
         }
         cachePassword(pwd);
         setSessionExpiry(SESSION_DURATION);
+        await chrome.storage.session.set({ cachedEntries: data.entries, cachedUrl: url });
         renderEntries(data.entries, domain);
       } catch (e: any) {
         document.getElementById('entries')!.innerHTML =
@@ -216,6 +217,7 @@ async function render(): Promise<void> {
       return;
     }
     renderEntries(data.entries, domain);
+    await chrome.storage.session.set({ cachedEntries: data.entries, cachedUrl: url });
   } catch {
     clearSession();
     render();

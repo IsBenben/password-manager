@@ -59,6 +59,10 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Install zip (Windows)
+        if: runner.os == 'Windows'
+        run: choco install zip
+
       - name: Build
         run: bash build.sh
 
