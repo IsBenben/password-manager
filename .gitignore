@@ -26,6 +26,10 @@ dist-ssr
 # Rust / Tauri build artifacts
 src-tauri/target/
 
+# Scratch / temp files
+error.txt
+example.html
+
 # Packed archives
 *.zip
 *.tar.gz
