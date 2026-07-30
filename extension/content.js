@@ -152,3 +152,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 if (findPasswordFields()) {
   chrome.runtime.sendMessage({ type: 'PASSWORD_FIELD_DETECTED', url: window.location.href });
 }
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+    e.preventDefault();
+    chrome.runtime.sendMessage({ type: 'AUTO_FILL' });
+  }
+});

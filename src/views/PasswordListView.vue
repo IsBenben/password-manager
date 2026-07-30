@@ -1,5 +1,5 @@
 <template>
-  <div class="layout">
+  <div class="layout" @keydown="handleKeydown" tabindex="-1">
     <AppSidebar :activeFilter="activeFilter" @filter="setFilter" />
 
     <main class="main-content">
@@ -11,26 +11,44 @@
               type="text"
               :placeholder="i18n.t('list.search_placeholder')"
               @input="onSearch"
+              ref="searchInputRef"
             />
             <button v-if="searchQuery" class="search-clear" @click="clearSearch" :title="i18n.t('list.clear_search')">&#x2715;</button>
           </div>
           <div class="search-info">
-            <span v-if="searchQuery">{{ i18n.t('list.search_count', String(store.entries.length), String(totalCount)) }}</span>
+            <span v-if="searchQuery">{{ i18n.t('list.search_count', String(sortedEntries.length), String(totalCount)) }}</span>
             <span v-else>{{ i18n.t('list.total_sites') }}: {{ totalCount }}</span>
           </div>
+        </div>
+        <div class="sort-controls">
+          <select v-model="sortBy" class="sort-select">
+            <option value="date">{{ i18n.t('list.sort_date') }}</option>
+            <option value="name">{{ i18n.t('list.sort_name') }}</option>
+            <option value="site">{{ i18n.t('list.sort_site') }}</option>
+          </select>
+          <button class="btn-sort-order" @click="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'" :title="sortOrder === 'asc' ? '↑' : '↓'">
+            {{ sortOrder === 'asc' ? '↑' : '↓' }}
+          </button>
         </div>
         <button class="btn-primary" @click="showAddForm = true">{{ i18n.t('list.add') }}</button>
       </header>
 
       <div class="content-body">
-        <div v-if="loading" class="loading">{{ i18n.t('list.loading') }}</div>
-        <div v-else-if="store.entries.length === 0" class="empty">
-          <p v-if="searchQuery">{{ i18n.t('list.empty_search') }}</p>
-          <p v-else>{{ i18n.t('list.empty') }}</p>
+        <div v-if="loading" class="skeleton-list">
+          <div v-for="n in 6" :key="n" class="skeleton-card">
+            <div class="skeleton-line w-60"></div>
+            <div class="skeleton-line w-40"></div>
+          </div>
+        </div>
+        <div v-else-if="sortedEntries.length === 0" class="empty-state">
+          <div class="empty-icon">&#128273;</div>
+          <p v-if="searchQuery" class="empty-title">{{ i18n.t('list.empty_search') }}</p>
+          <p v-else class="empty-title">{{ i18n.t('list.empty') }}</p>
+          <p class="empty-hint">{{ i18n.t('list.empty_hint') }}</p>
         </div>
         <div v-else class="entries-list">
           <div
-            v-for="entry in store.entries"
+            v-for="entry in sortedEntries"
             :key="entry.id"
             class="entry-card"
             @click="viewEntry(entry.id)"
@@ -61,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePasswordStore, type PasswordEntry } from '../stores/passwordStore'
 import { useAuthStore } from '../stores/authStore'
@@ -78,10 +96,26 @@ const i18n = useI18nStore()
 const toast = useToast()
 
 const searchQuery = ref('')
+const searchInputRef = ref<HTMLInputElement | null>(null)
 const loading = ref(true)
 const showAddForm = ref(false)
 const totalCount = ref(0)
 const activeFilter = ref<string | null>(null)
+const sortBy = ref<'name' | 'date' | 'site'>('date')
+const sortOrder = ref<'asc' | 'desc'>('desc')
+
+const sortedEntries = computed(() => {
+  const list = [...store.entries]
+  list.sort((a, b) => {
+    if (a.favorite !== b.favorite) return a.favorite ? -1 : 1
+    let cmp = 0
+    if (sortBy.value === 'name') cmp = a.username.localeCompare(b.username)
+    else if (sortBy.value === 'site') cmp = a.site_url.localeCompare(b.site_url)
+    else cmp = a.updated_at - b.updated_at
+    return sortOrder.value === 'asc' ? cmp : -cmp
+  })
+  return list
+})
 
 onMounted(async () => {
   if (!auth.checkSession()) {
@@ -105,6 +139,31 @@ onMounted(async () => {
 
   loading.value = false
 })
+
+function handleKeydown(e: KeyboardEvent) {
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 'f') {
+      e.preventDefault()
+      searchInputRef.value?.focus()
+      return
+    }
+    if (e.key === 'n') {
+      e.preventDefault()
+      showAddForm.value = true
+      return
+    }
+  }
+  if (e.key === 'Escape') {
+    if (searchQuery.value) {
+      clearSearch()
+    } else if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', handleKeydown, { capture: true }))
+onUnmounted(() => window.removeEventListener('keydown', handleKeydown, { capture: true }))
 
 let searchTimer: ReturnType<typeof setTimeout>
 async function doSearch() {
@@ -225,4 +284,32 @@ function autofillLabel(entry: PasswordEntry): string {
 .entry-tags { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.125rem; }
 .entry-category { display: inline-block; font-size: 0.625rem; padding: 0.0625rem 0.375rem; border-radius: 3px; background: var(--hover-bg); color: var(--text-secondary); }
 .entry-date { font-size: 0.75rem; color: var(--text-secondary); }
+.sort-controls { display: flex; align-items: center; gap: 0.25rem; }
+.sort-select {
+  padding: 0.375rem 0.5rem; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 0.8125rem; background: var(--bg); color: var(--text); cursor: pointer;
+}
+.sort-select:focus { outline: none; border-color: var(--primary); }
+.btn-sort-order {
+  width: 28px; height: 28px; padding: 0; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--bg); color: var(--text); cursor: pointer; font-size: 0.875rem;
+}
+.btn-sort-order:hover { border-color: var(--primary); color: var(--primary); }
+.skeleton-list { display: grid; gap: 0.5rem; padding: 0.5rem 0; }
+.skeleton-card {
+  padding: 1rem; background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 8px; display: flex; flex-direction: column; gap: 0.5rem;
+}
+.skeleton-line {
+  height: 14px; border-radius: 4px;
+  background: linear-gradient(90deg, var(--border) 25%, var(--hover-bg) 50%, var(--border) 75%);
+  background-size: 200% 100%; animation: shimmer 1.5s infinite;
+}
+.skeleton-line.w-60 { width: 60%; }
+.skeleton-line.w-40 { width: 40%; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; color: var(--text-secondary); }
+.empty-icon { font-size: 3rem; margin-bottom: 0.75rem; opacity: 0.5; }
+.empty-title { font-size: 1rem; margin: 0 0 0.25rem; }
+.empty-hint { font-size: 0.8125rem; margin: 0; }
 </style>

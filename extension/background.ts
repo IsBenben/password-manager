@@ -49,6 +49,21 @@ chrome.runtime.onMessage.addListener((
       .catch((err: Error) => sendResponse({ error: err.message }));
     return true;
   }
+  if (message.type === 'AUTO_FILL') {
+    chrome.storage.session.get(['cachedEntries', 'cachedUrl']).then(({ cachedEntries, cachedUrl }) => {
+      if (!cachedEntries?.length || !cachedUrl) return;
+      chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+        const tab = tabs[0];
+        if (tab?.id && tab.url && tab.url === cachedUrl) {
+          chrome.tabs.sendMessage(tab.id, { type: 'FILL_TARGET', entries: cachedEntries, fillType: 'username' });
+          setTimeout(() => {
+            chrome.tabs.sendMessage(tab.id, { type: 'FILL_TARGET', entries: cachedEntries, fillType: 'password' });
+          }, 100);
+        }
+      });
+    });
+    return false;
+  }
 });
 
 async function decryptEntries(siteUrl: string, password: string) {

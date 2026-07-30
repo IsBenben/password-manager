@@ -2,6 +2,7 @@ use crate::{
     git_sync::GitSync,
     models::{CategoryInfo, Config, NewEntry, PasswordEntry},
     storage::Storage,
+    wordlist,
 };
 use std::sync::{Arc, Mutex};
 use tauri::State;
@@ -34,7 +35,9 @@ pub(crate) fn toggle_favorite(
     state: State<AppData>,
 ) -> Result<bool, String> {
     let mut storage = state.storage.lock().map_err(|e| e.to_string())?;
-    storage.toggle_favorite(&id)
+    let result = storage.toggle_favorite(&id);
+    log::info!("Toggled favorite for entry {}", id);
+    result
 }
 
 #[tauri::command]
@@ -55,6 +58,7 @@ pub(crate) fn add_entry(
 ) -> Result<bool, String> {
     let mut storage = state.storage.lock().map_err(|e| e.to_string())?;
     storage.add_entry(entry, &password)?;
+    log::info!("Added new entry");
     Ok(true)
 }
 
@@ -67,6 +71,7 @@ pub(crate) fn edit_entry(
 ) -> Result<bool, String> {
     let mut storage = state.storage.lock().map_err(|e| e.to_string())?;
     storage.edit_entry(&id, entry, &password)?;
+    log::info!("Edited entry {}", id);
     Ok(true)
 }
 
@@ -74,6 +79,7 @@ pub(crate) fn edit_entry(
 pub(crate) fn delete_entry(id: String, state: State<AppData>) -> Result<bool, String> {
     let mut storage = state.storage.lock().map_err(|e| e.to_string())?;
     storage.delete_entry(&id)?;
+    log::info!("Deleted entry {}", id);
     Ok(true)
 }
 
@@ -85,6 +91,7 @@ pub(crate) fn change_master_password(
 ) -> Result<bool, String> {
     let mut storage = state.storage.lock().map_err(|e| e.to_string())?;
     storage.change_master_password(&old, &new)?;
+    log::info!("Master password changed");
     Ok(true)
 }
 
@@ -92,6 +99,7 @@ pub(crate) fn change_master_password(
 pub(crate) fn init_password(password: String, state: State<AppData>) -> Result<bool, String> {
     let mut storage = state.storage.lock().map_err(|e| e.to_string())?;
     storage.init_salt(&password)?;
+    log::info!("Password manager initialized");
     Ok(true)
 }
 
@@ -99,6 +107,7 @@ pub(crate) fn init_password(password: String, state: State<AppData>) -> Result<b
 pub(crate) fn verify_password(password: String, state: State<AppData>) -> Result<bool, String> {
     let storage = state.storage.lock().map_err(|e| e.to_string())?;
     storage.verify_password(&password)?;
+    log::info!("Password verified");
     Ok(true)
 }
 
@@ -252,17 +261,66 @@ pub(crate) fn import_csv(path: String, password: String, state: State<AppData>) 
 
 #[tauri::command]
 pub(crate) fn import_json(path: String, password: String, state: State<AppData>) -> Result<String, String> {
-    let content = std::fs::read_to_string(&PathBuf::from(&path))
+    let import_path = PathBuf::from(&path);
+    let content = std::fs::read_to_string(&import_path)
         .map_err(|e| format!("Failed to read import file: {}", e))?;
     let mut storage = state.storage.lock().map_err(|e| e.to_string())?;
     storage.verify_password(&password)?;
-    std::fs::write(storage.get_file_path(), &content)
+
+    // Auto-backup before overwriting
+    let data_path = storage.get_file_path().clone();
+    let backup_path = data_path.with_extension("json.bak");
+    if data_path.exists() {
+        if let Ok(original) = std::fs::read_to_string(&data_path) {
+            std::fs::write(&backup_path, &original).ok();
+        }
+    }
+
+    std::fs::write(&data_path, &content)
         .map_err(|e| format!("Failed to write data file: {}", e))?;
     storage.reload()?;
+    log::info!("Import completed from {}", path);
     Ok(format!("Imported from {}", path))
 }
 
 use rand::seq::SliceRandom;
+use rand::Rng;
+
+#[tauri::command]
+pub(crate) fn generate_passphrase(
+    word_count: Option<u32>,
+    separator: Option<String>,
+    capitalize: Option<bool>,
+    append_number: Option<bool>,
+) -> Result<String, String> {
+    let count = word_count.unwrap_or(4).max(2).min(12) as usize;
+    let sep = separator.unwrap_or_else(|| "-".to_string());
+    let cap = capitalize.unwrap_or(false);
+    let num = append_number.unwrap_or(false);
+
+    let mut rng = rand::thread_rng();
+    let mut words: Vec<String> = (0..count)
+        .map(|_| {
+            let w = wordlist::WORDS.choose(&mut rng).unwrap().to_string();
+            if cap {
+                let mut chars = w.chars();
+                match chars.next() {
+                    None => w,
+                    Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+                }
+            } else {
+                w
+            }
+        })
+        .collect();
+
+    if num {
+        let digits: u16 = rng.gen_range(10..99);
+        words.push(digits.to_string());
+    }
+
+    Ok(words.join(&sep))
+}
 
 #[tauri::command]
 pub(crate) fn generate_password(

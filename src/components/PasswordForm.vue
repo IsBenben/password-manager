@@ -5,7 +5,7 @@
       <form @submit.prevent="handleSave">
         <div class="field">
           <label>{{ i18n.t('form.site_url') }}</label>
-          <input v-model="form.site_url" type="text" :placeholder="i18n.t('form.site_url_placeholder')" />
+          <input v-model="form.site_url" type="text" :placeholder="i18n.t('form.site_url_placeholder')" ref="firstInputRef" autofocus />
           <p v-if="httpsWarning" class="warning">{{ httpsWarning }}</p>
         </div>
         <div class="field">
@@ -96,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, computed } from 'vue'
+import { ref, reactive, watch, computed, nextTick } from 'vue'
 import { usePasswordStore, type NewEntry, type EmailInfo, serializeEmails, parseEmails } from '../stores/passwordStore'
 import { useAuthStore } from '../stores/authStore'
 import { useI18nStore } from '../stores/i18nStore'
@@ -123,6 +123,16 @@ const toast = useToast()
 const saving = ref(false)
 const error = ref('')
 const showGenerator = ref(false)
+const firstInputRef = ref<HTMLInputElement | null>(null)
+
+watch(() => props.visible, async (v) => {
+  if (v) {
+    await nextTick()
+    requestAnimationFrame(() => {
+      setTimeout(() => firstInputRef.value?.focus(), 150)
+    })
+  }
+})
 
 const form = reactive<NewEntry>({
   site_url: '',
