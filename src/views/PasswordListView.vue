@@ -68,12 +68,14 @@ import { useAuthStore } from '../stores/authStore'
 import { useI18nStore } from '../stores/i18nStore'
 import PasswordForm from '../components/PasswordForm.vue'
 import AppSidebar from '../components/AppSidebar.vue'
+import { useToast } from '../stores/toastStore'
 
 const router = useRouter()
 const route = useRoute()
 const store = usePasswordStore()
 const auth = useAuthStore()
 const i18n = useI18nStore()
+const toast = useToast()
 
 const searchQuery = ref('')
 const loading = ref(true)
@@ -147,6 +149,7 @@ function clearSearch() {
 async function toggleFav(entry: any) {
   await store.toggleFavorite(entry.id)
   entry.favorite = !entry.favorite
+  toast.success(i18n.t(entry.favorite ? 'toast.fav_on' : 'toast.fav_off'))
   await store.fetchCategories()
 }
 

@@ -100,6 +100,7 @@ import { ref, reactive, watch, computed } from 'vue'
 import { usePasswordStore, type NewEntry, type EmailInfo, serializeEmails, parseEmails } from '../stores/passwordStore'
 import { useAuthStore } from '../stores/authStore'
 import { useI18nStore } from '../stores/i18nStore'
+import { useToast } from '../stores/toastStore'
 import PasswordGenerator from './PasswordGenerator.vue'
 import PasswordStrengthMeter from './PasswordStrengthMeter.vue'
 
@@ -117,6 +118,7 @@ const emit = defineEmits<{
 const store = usePasswordStore()
 const auth = useAuthStore()
 const i18n = useI18nStore()
+const toast = useToast()
 
 const saving = ref(false)
 const error = ref('')
@@ -235,6 +237,7 @@ async function handleSave() {
     } else {
       await store.addEntry(entry, auth.currentPassword)
     }
+    toast.success(i18n.t('toast.saved'))
     emit('saved')
   } catch (e: any) {
     error.value = typeof e === 'string' ? e : i18n.t('form.error_save')
