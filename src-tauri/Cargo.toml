@@ -38,3 +38,4 @@ axum = "0.7"
 chrono = "0.4"
 totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
 dirs = "6"
+csv = "1.3"
