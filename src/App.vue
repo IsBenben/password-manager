@@ -1,8 +1,8 @@
 <template>
   <div id="app-root">
     <div class="corner-actions">
-      <button class="corner-btn" @click="themeStore.toggle()" :title="i18n.t(themeStore.theme === 'dark' ? 'app.theme_light' : 'app.theme_dark')">
-        {{ themeStore.theme === 'dark' ? '\u2600' : '\u263E' }}
+      <button class="corner-btn" @click="themeStore.toggle()" :title="i18n.t(themeStore.effectiveTheme === 'dark' ? 'app.theme_light' : 'app.theme_dark')">
+        {{ themeStore.effectiveTheme === 'dark' ? '\u2600' : '\u263E' }}
       </button>
       <button class="corner-btn" @click="i18n.toggleLang()" :title="i18n.t('app.switch_language')">
         {{ i18n.langLabel }}

@@ -154,6 +154,7 @@ export const en = {
     theme: 'Theme',
     theme_light: 'Light',
     theme_dark: 'Dark',
+    theme_system: 'System default',
     git_commit_message: 'Update password data',
     about: 'About',
     data_path: 'Data stored at: ~/.password-manager/data.json',
