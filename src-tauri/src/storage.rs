@@ -1,5 +1,5 @@
 use crate::crypto;
-use crate::models::{Config, DataFile, EmailInfo, NewEntry, PasswordEntry};
+use crate::models::{CategoryInfo, Config, DataFile, EmailInfo, NewEntry, PasswordEntry};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use chrono::Utc;
@@ -78,6 +78,14 @@ impl Storage {
         let content =
             serde_json::to_string_pretty(&self.data).map_err(|e| format!("Serialization error: {}", e))?;
         std::fs::write(&self.file_path, content).map_err(|e| format!("Write error: {}", e))?;
+        #[cfg(unix)]
+        {
+            use std::fs::Permissions;
+            use std::os::unix::fs::PermissionsExt;
+            if let Err(e) = std::fs::set_permissions(&self.file_path, Permissions::from_mode(0o600)) {
+                log::warn!("Failed to set file permissions: {}", e);
+            }
+        }
         Ok(())
     }
 
@@ -123,22 +131,72 @@ impl Storage {
         Ok(salt)
     }
 
-    pub fn list_entries(&self, search: Option<&str>) -> Vec<PasswordEntry> {
-        if let Some(query) = search {
-            let q = query.to_lowercase();
-            self.data
-                .entries
-                .iter()
-                .filter(|e| {
-                    e.site_url.to_lowercase().contains(&q)
-                        || e.username.to_lowercase().contains(&q)
-                        || e.note.to_lowercase().contains(&q)
-                })
-                .cloned()
-                .collect()
-        } else {
-            self.data.entries.clone()
+    pub fn list_entries(
+        &self,
+        search: Option<&str>,
+        category: Option<&str>,
+        favorite: Option<bool>,
+    ) -> Vec<PasswordEntry> {
+        self.data
+            .entries
+            .iter()
+            .filter(|e| {
+                if let Some(q) = search {
+                    let q = q.to_lowercase();
+                    if !e.site_url.to_lowercase().contains(&q)
+                        && !e.username.to_lowercase().contains(&q)
+                        && !e.note.to_lowercase().contains(&q)
+                    {
+                        return false;
+                    }
+                }
+                if let Some(cat) = category {
+                    let tags: Vec<&str> = e.category.split_whitespace().collect();
+                    if cat.is_empty() {
+                        if !tags.is_empty() {
+                            return false;
+                        }
+                    } else if !tags.iter().any(|t| t.eq_ignore_ascii_case(cat)) {
+                        return false;
+                    }
+                }
+                if let Some(fav) = favorite {
+                    if e.favorite != fav {
+                        return false;
+                    }
+                }
+                true
+            })
+            .cloned()
+            .collect()
+    }
+
+    pub fn list_categories(&self) -> Vec<CategoryInfo> {
+        let mut map: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+        for entry in &self.data.entries {
+            let tags: Vec<&str> = entry.category.split_whitespace().collect();
+            if tags.is_empty() {
+                *map.entry(String::new()).or_insert(0) += 1;
+            } else {
+                for tag in tags {
+                    *map.entry(tag.to_string()).or_insert(0) += 1;
+                }
+            }
         }
+        let mut result: Vec<CategoryInfo> = map
+            .into_iter()
+            .map(|(name, count)| CategoryInfo { name, count })
+            .collect();
+        result.sort_by(|a, b| {
+            let a_is_empty = a.name.is_empty();
+            let b_is_empty = b.name.is_empty();
+            if a_is_empty != b_is_empty {
+                b_is_empty.cmp(&a_is_empty)
+            } else {
+                b.count.cmp(&a.count)
+            }
+        });
+        result
     }
 
     pub fn get_entry(&self, id: &str, password: &str) -> Result<PasswordEntry, String> {
@@ -204,6 +262,8 @@ impl Storage {
                 .map(|t| crypto::encrypt_field(&t, password, &salt)),
             note: entry.note,
             autofill_mode: entry.autofill_mode,
+            category: entry.category,
+            favorite: entry.favorite,
             created_at: now,
             updated_at: now,
         };
@@ -239,6 +299,8 @@ impl Storage {
             .map(|t| crypto::encrypt_field(&t, password, &salt));
         existing.note = entry.note;
         existing.autofill_mode = entry.autofill_mode;
+        existing.category = entry.category;
+        existing.favorite = entry.favorite;
         existing.updated_at = now;
         self.save()
     }
@@ -292,6 +354,23 @@ impl Storage {
     pub fn update_config(&mut self, config: Config) -> Result<(), String> {
         self.data.config = config;
         self.save()
+    }
+
+    pub fn toggle_favorite(&mut self, id: &str) -> Result<bool, String> {
+        let now = Utc::now().timestamp() as u64;
+        let fav = self
+            .data
+            .entries
+            .iter_mut()
+            .find(|e| e.id == id)
+            .ok_or_else(|| "Entry not found".to_string())
+            .map(|e| {
+                e.favorite = !e.favorite;
+                e.updated_at = now;
+                e.favorite
+            })?;
+        self.save()?;
+        Ok(fav)
     }
 
     pub fn get_salt_bytes(&self) -> Result<Vec<u8>, String> {

@@ -9,7 +9,8 @@ function bgT(key) {
   return msgs[lang][key] || msgs.en[key];
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id) return;
   if (message.type === 'DECRYPT') {
     decryptEntries(message.siteUrl, message.password)
       .then(sendResponse)

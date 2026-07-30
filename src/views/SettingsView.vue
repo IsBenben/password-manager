@@ -1,24 +1,11 @@
 <template>
   <div class="layout">
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <h2>{{ i18n.t('app.title') }}</h2>
-      </div>
-      <nav>
-        <router-link to="/list" class="nav-item">
-          <span class="nav-icon">&#128273;</span> {{ i18n.t('nav.all_passwords') }}
-        </router-link>
-        <router-link to="/settings" class="nav-item active">
-          <span class="nav-icon">&#9881;</span> {{ i18n.t('nav.settings') }}
-        </router-link>
-      </nav>
-    </aside>
+    <AppSidebar @filter="navigateToList" />
 
     <main class="main-content">
       <header class="top-bar">
         <h2>{{ i18n.t('settings.title') }}</h2>
       </header>
-
       <div class="settings-body">
         <section class="setting-section">
           <h3>{{ i18n.t('settings.master_password') }}</h3>
@@ -50,10 +37,6 @@
               <label>{{ i18n.t('settings.git_remote') }}</label>
               <input v-model="gitRemote" type="text" :placeholder="i18n.t('settings.git_remote_placeholder')" />
             </div>
-            <div class="field">
-              <label>{{ i18n.t('settings.font_family') }}</label>
-              <input v-model="fontFamily" type="text" :placeholder="i18n.t('settings.font_placeholder')" />
-            </div>
             <p v-if="gitError" class="error">{{ gitError }}</p>
             <p v-if="gitSuccess" class="success">{{ gitSuccess }}</p>
             <div class="btn-group">
@@ -62,6 +45,29 @@
               <button type="button" class="btn-secondary" @click="handleGitPull">{{ i18n.t('settings.pull_from_git') }}</button>
             </div>
           </form>
+        </section>
+
+        <section class="setting-section">
+          <h3>{{ i18n.t('settings.appearance') }}</h3>
+          <div class="setting-form">
+            <div class="field">
+              <label>{{ i18n.t('settings.theme') }}</label>
+              <div class="radio-group">
+                <label class="radio-row">
+                  <input v-model="themeMode" type="radio" value="light" @change="updateTheme" />
+                  {{ i18n.t('settings.theme_light') }}
+                </label>
+                <label class="radio-row">
+                  <input v-model="themeMode" type="radio" value="dark" @change="updateTheme" />
+                  {{ i18n.t('settings.theme_dark') }}
+                </label>
+              </div>
+            </div>
+            <div class="field">
+              <label>{{ i18n.t('settings.font_family') }}</label>
+              <input v-model="fontFamily" type="text" :placeholder="i18n.t('settings.font_placeholder')" @change="updateFont" />
+            </div>
+          </div>
         </section>
 
         <section class="setting-section">
@@ -112,8 +118,10 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import { useConfigStore } from '../stores/configStore'
+import { useThemeStore } from '../stores/themeStore'
 import { usePasswordStore } from '../stores/passwordStore'
 import { useI18nStore } from '../stores/i18nStore'
+import AppSidebar from '../components/AppSidebar.vue'
 import { invoke } from '@tauri-apps/api/core'
 
 const router = useRouter()
@@ -121,6 +129,31 @@ const auth = useAuthStore()
 const configStore = useConfigStore()
 const passwordStore = usePasswordStore()
 const i18n = useI18nStore()
+const themeStore = useThemeStore()
+
+const themeMode = ref(themeStore.theme)
+function updateTheme() {
+  themeStore.set(themeMode.value)
+}
+
+async function updateFont() {
+  await configStore.updateConfig({
+    git_remote: configStore.config.git_remote,
+    font_family: fontFamily.value,
+    session_timeout_minutes: configStore.config.session_timeout_minutes,
+  })
+  document.documentElement.style.setProperty('--app-font', fontFamily.value)
+}
+
+function navigateToList(cat?: string) {
+  if (cat === '__fav__') {
+    router.push('/list?fav=1')
+  } else if (cat !== undefined) {
+    router.push('/list?cat=' + encodeURIComponent(cat))
+  } else {
+    router.push('/list')
+  }
+}
 
 const changePwd = ref({ old: '', new: '', confirm: '' })
 const pwdError = ref('')
@@ -183,10 +216,9 @@ async function handleGitConfig() {
   try {
     await configStore.updateConfig({
       git_remote: gitRemote.value,
-      font_family: fontFamily.value,
+      font_family: configStore.config.font_family,
       session_timeout_minutes: configStore.config.session_timeout_minutes,
     })
-    document.documentElement.style.setProperty('--app-font', fontFamily.value)
     gitSuccess.value = i18n.t('settings.success_config')
   } catch (e: any) {
     gitError.value = typeof e === 'string' ? e : i18n.t('settings.error_config')
@@ -269,22 +301,10 @@ async function handleImport() {
 
 <style scoped>
 .layout { display: flex; height: 100vh; }
-.sidebar {
-  width: 240px; background: var(--card-bg); border-right: 1px solid var(--border);
-  display: flex; flex-direction: column; flex-shrink: 0;
-}
-.sidebar-header { padding: 1.25rem; border-bottom: 1px solid var(--border); }
-.sidebar-header h2 { margin: 0; font-size: 1.125rem; }
-nav { flex: 1; padding: 0.75rem; }
-.nav-item {
-  display: flex; align-items: center; gap: 0.5rem; padding: 0.625rem 0.75rem;
-  border-radius: 6px; color: var(--text); text-decoration: none; font-size: 0.9375rem;
-}
-.nav-item:hover, .nav-item.active { background: var(--hover-bg); }
 .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.top-bar { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
+.top-bar { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
 .top-bar h2 { margin: 0; font-size: 1.25rem; }
-.settings-body { flex: 1; overflow-y: auto; padding: 1.5rem; }
+.settings-body { flex: 1; overflow-y: auto; padding: 1.5rem; min-height: 0; }
 .setting-section {
   background: var(--card-bg); border: 1px solid var(--border);
   border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem;
@@ -305,5 +325,8 @@ input:focus { outline: none; border-color: var(--primary); }
 .btn-secondary { background: var(--hover-bg); color: var(--text); margin-left: 0.5rem; }
 .btn-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .btn-group button { margin: 0; }
+.radio-group { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 0.25rem; }
+.radio-row { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; font-weight: 400; cursor: pointer; }
+.radio-row input[type="radio"] { width: auto; margin: 0; }
 .about-text { font-size: 0.875rem; color: var(--text-secondary); margin: 0.25rem 0; }
 </style>

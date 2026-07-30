@@ -9,6 +9,13 @@
           <p v-if="httpsWarning" class="warning">{{ httpsWarning }}</p>
         </div>
         <div class="field">
+          <label>{{ i18n.t('form.category') }}</label>
+          <input v-model="form.category" type="text" :placeholder="i18n.t('form.category_placeholder')" list="category-suggestions" />
+          <datalist id="category-suggestions">
+            <option v-for="c in store.categories" :key="c.name" :value="c.name" />
+          </datalist>
+        </div>
+        <div class="field">
           <label>{{ i18n.t('form.username') }}</label>
           <input v-model="form.username" type="text" :placeholder="i18n.t('form.username_placeholder')" />
         </div>
@@ -18,7 +25,7 @@
             <input v-model="form.password" type="password" :placeholder="i18n.t('form.password_placeholder')" />
             <button type="button" class="btn-gen" @click="showGenerator = true">{{ i18n.t('form.gen_password') }}</button>
           </div>
-          <p v-if="weakPwdWarning" class="warning">{{ weakPwdWarning }}</p>
+          <PasswordStrengthMeter :password="form.password" />
         </div>
         <div class="field">
           <label>{{ i18n.t('form.email') }}</label>
@@ -64,6 +71,12 @@
           <label>{{ i18n.t('form.note') }}</label>
           <textarea v-model="form.note" rows="3" :placeholder="i18n.t('form.note_placeholder')"></textarea>
         </div>
+        <div class="field checkbox-field">
+          <label class="checkbox-row">
+            <input v-model="form.favorite" type="checkbox" />
+            {{ i18n.t('form.favorite') }}
+          </label>
+        </div>
         <p v-if="error" class="error">{{ error }}</p>
         <div class="modal-actions">
           <button type="button" class="btn-cancel" @click="$emit('close')">{{ i18n.t('form.cancel') }}</button>
@@ -88,6 +101,7 @@ import { usePasswordStore, type NewEntry, type EmailInfo, serializeEmails, parse
 import { useAuthStore } from '../stores/authStore'
 import { useI18nStore } from '../stores/i18nStore'
 import PasswordGenerator from './PasswordGenerator.vue'
+import PasswordStrengthMeter from './PasswordStrengthMeter.vue'
 
 const props = defineProps<{
   visible: boolean
@@ -117,6 +131,8 @@ const form = reactive<NewEntry>({
   twofa_secret: null,
   note: '',
   autofill_mode: 'default',
+  category: '',
+  favorite: false,
 })
 
 const emailList = reactive<EmailInfo[]>([])
@@ -125,36 +141,12 @@ const autofillMode = ref('default')
 
 const isEdit = !!props.entryId
 
-const WEAK_PATTERNS = [
-  /^123456$/i, /^12345678$/i, /^123456789$/i, /^password$/i,
-  /^qwerty$/i, /^abc123$/i, /^admin123$/i, /^passw0rd$/i,
-  /^letmein$/i, /^welcome$/i, /^monkey$/i, /^dragon$/i,
-  /^master$/i, /^123456Aa$/i, /^Aa123456$/i,
-]
-
-function isWeakPassword(pwd: string): boolean {
-  if (!pwd || pwd.length < 6) return false
-  for (const pattern of WEAK_PATTERNS) {
-    if (pattern.test(pwd)) return true
-  }
-  const digits = (pwd.match(/\d/g) || []).length
-  if (pwd.length >= 6 && digits === pwd.length) return true
-  return false
-}
-
 const httpsWarning = computed(() => {
   const url = form.site_url.trim()
   if (!url) return ''
   if (!/^https?:\/\//i.test(url)) return ''
   if (!url.toLowerCase().startsWith('https://')) {
     return i18n.t('form.warning_http')
-  }
-  return ''
-})
-
-const weakPwdWarning = computed(() => {
-  if (isWeakPassword(form.password)) {
-    return i18n.t('form.warning_weak_password')
   }
   return ''
 })
@@ -196,10 +188,12 @@ watch(
     if (data) {
       form.site_url = data.site_url
       form.username = data.username
-      form.password = ''
+      form.password = data.password
       form.phone = data.phone
       form.twofa_secret = data.twofa_secret
       form.note = data.note
+      form.category = data.category || ''
+      form.favorite = !!data.favorite
       const parsed = parseEmails(data.emails_raw)
       emailList.length = 0
       parsed.forEach((e) => emailList.push({ ...e }))
@@ -232,6 +226,8 @@ async function handleSave() {
       twofa_secret: form.twofa_secret || null,
       note: form.note,
       autofill_mode: autofillMode.value,
+      category: form.category,
+      favorite: form.favorite,
     }
 
     if (isEdit && props.entryId) {
@@ -272,14 +268,19 @@ textarea { resize: vertical; }
 .btn-gen {
   padding: 0.5rem 0.625rem; background: var(--hover-bg); border: 1px solid var(--border);
   border-radius: 6px; cursor: pointer; font-size: 0.8125rem; white-space: nowrap;
+  color: inherit;
 }
+.btn-gen:hover { border-color: var(--primary); color: var(--primary); }
 .email-row { display: flex; gap: 0.25rem; margin-bottom: 0.25rem; }
 .email-row input { flex: 1; }
 .btn-sm {
   width: 28px; height: 28px; padding: 0; background: var(--hover-bg);
   border: 1px solid var(--border); border-radius: 4px; cursor: pointer;
-  font-size: 0.8125rem; flex-shrink: 0;
+  font-size: 0.8125rem; flex-shrink: 0; color: inherit;
 }
+.btn-sm:hover { border-color: var(--primary); color: var(--primary); }
+.btn-remove { color: var(--danger); }
+.btn-remove:hover { border-color: var(--danger); color: var(--danger); }
 .btn-remove { color: var(--danger); }
 .btn-add-email {
   margin-top: 0.25rem; padding: 0.25rem 0.5rem; background: none;
@@ -291,6 +292,9 @@ textarea { resize: vertical; }
 .radio-group { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 0.25rem; }
 .radio-row { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; font-weight: 400; cursor: pointer; }
 .radio-row input[type="radio"] { width: auto; margin: 0; }
+.checkbox-field { margin-bottom: 0.5rem; }
+.checkbox-row { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; font-weight: 400; cursor: pointer; }
+.checkbox-row input[type="checkbox"] { width: auto; margin: 0; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
 .btn-cancel, .btn-save { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9375rem; }
 .btn-cancel { background: var(--hover-bg); color: var(--text); }

@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Rust / Tauri build artifacts
+src-tauri/target/
+
+# Packed archives
+*.zip
+*.tar.gz
+*.tgz

@@ -6,12 +6,15 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tokio::net::TcpListener;
 
 #[derive(Clone)]
 pub struct AppState {
     pub storage: Arc<Mutex<Storage>>,
+    pub fail_count: Arc<AtomicU32>,
 }
 
 #[derive(Deserialize)]
@@ -47,6 +50,17 @@ async fn decrypt(
     State(state): State<AppState>,
     Json(req): Json<DecryptRequest>,
 ) -> Result<Json<DecryptResponse>, (StatusCode, String)> {
+    let fail_count = state.fail_count.load(Ordering::Relaxed);
+    if fail_count >= 10 {
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many failed attempts. Try again later.".to_string(),
+        ));
+    }
+    if fail_count > 0 {
+        tokio::time::sleep(Duration::from_secs(fail_count as u64)).await;
+    }
+
     let storage = state.storage.lock().map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -54,8 +68,15 @@ async fn decrypt(
         )
     })?;
 
+    let password_valid = storage.verify_password(&req.password).is_ok();
+
+    if !password_valid {
+        state.fail_count.fetch_add(1, Ordering::Relaxed);
+        return Err((StatusCode::UNAUTHORIZED, "Wrong password".to_string()));
+    }
+
     let domain = extract_domain(&req.site_url);
-    let entries = storage.list_entries(None);
+    let entries = storage.list_entries(None, None, None);
 
     use crate::models::EmailInfo;
 
@@ -94,6 +115,7 @@ async fn decrypt(
         }
     }
 
+    state.fail_count.store(0, Ordering::Relaxed);
     Ok(Json(DecryptResponse { entries: matched }))
 }
 
@@ -106,7 +128,10 @@ fn extract_domain(url: &str) -> String {
 }
 
 pub async fn start_http_server(storage: Arc<Mutex<Storage>>) {
-    let state = AppState { storage };
+    let state = AppState {
+        storage,
+        fail_count: Arc::new(AtomicU32::new(0)),
+    };
     let app = Router::new()
         .route("/api/health", get(health))
         .route("/api/decrypt", post(decrypt))

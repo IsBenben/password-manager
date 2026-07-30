@@ -1,22 +1,10 @@
 <template>
   <div class="layout">
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <h2>{{ i18n.t('app.title') }}</h2>
-      </div>
-      <nav>
-        <router-link to="/list" class="nav-item">
-          <span class="nav-icon">&#128273;</span> {{ i18n.t('nav.all_passwords') }}
-        </router-link>
-        <router-link to="/settings" class="nav-item">
-          <span class="nav-icon">&#9881;</span> {{ i18n.t('nav.settings') }}
-        </router-link>
-      </nav>
-    </aside>
+    <AppSidebar @filter="navigateToList" />
 
     <main class="main-content">
       <header class="top-bar">
-        <button class="btn-back" @click="goBack">{{ i18n.t('detail.back') }}</button>
+        <h2 class="detail-title">{{ entry?.site_url || entry?.username || '' }}</h2>
         <div class="top-actions">
           <button class="btn-edit" @click="showEditForm = true">{{ i18n.t('detail.edit') }}</button>
           <button class="btn-delete" @click="handleDelete">{{ i18n.t('detail.delete') }}</button>
@@ -30,8 +18,18 @@
           <div class="detail-row">
             <label>{{ i18n.t('detail.site_url') }}</label>
             <div class="value">
-              {{ entry.site_url }}
+              <a v-if="entry.site_url" :href="entry.site_url" target="_blank" class="url-link">{{ entry.site_url }}</a>
+              <span v-else>{{ entry.site_url }}</span>
               <p v-if="entry.site_url && !entry.site_url.toLowerCase().startsWith('https://')" class="warning-inline">{{ i18n.t('form.warning_http') }}</p>
+            </div>
+          </div>
+          <div class="detail-row">
+            <label>{{ i18n.t('detail.category') }}</label>
+            <div class="value">
+              <span v-if="entry.category">
+                <span v-for="t in entry.category.split(/\s+/)" :key="t" class="detail-cat-tag">{{ t }}</span>
+              </span>
+              <span v-else>{{ i18n.t('detail.uncategorized') }}</span>
             </div>
           </div>
           <div class="detail-row">
@@ -41,6 +39,14 @@
           <div class="detail-row">
             <label>{{ i18n.t('detail.autofill_mode') }}</label>
             <div class="value">{{ autofillModeLabel }}</div>
+          </div>
+          <div class="detail-row">
+            <label>{{ i18n.t('detail.favorite') }}</label>
+            <div class="value">
+              <button class="btn-fav" @click="handleToggleFav">
+                {{ entry.favorite ? i18n.t('detail.favorite_on') : i18n.t('detail.favorite_off') }}
+              </button>
+            </div>
           </div>
           <div class="detail-row">
             <label>{{ i18n.t('detail.password') }}</label>
@@ -131,6 +137,7 @@ import { usePasswordStore, parseEmails, type NewEntry, type EmailInfo } from '..
 import { useAuthStore } from '../stores/authStore'
 import { useI18nStore } from '../stores/i18nStore'
 import PasswordForm from '../components/PasswordForm.vue'
+import AppSidebar from '../components/AppSidebar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -168,12 +175,14 @@ const editData = computed<NewEntry | null>(() => {
   return {
     site_url: entry.value.site_url,
     username: entry.value.username,
-    password: '',
+    password: entry.value.password,
     emails_raw: entry.value.emails_raw,
     phone: entry.value.phone,
     twofa_secret: entry.value.twofa_secret,
     note: entry.value.note,
     autofill_mode: entry.value.autofill_mode || 'default',
+    category: entry.value.category || '',
+    favorite: !!entry.value.favorite,
   }
 })
 
@@ -200,7 +209,15 @@ async function decryptEntry() {
   }
 }
 
-function goBack() { router.push('/list') }
+function navigateToList(cat?: string) {
+  if (cat === '__fav__') {
+    router.push('/list?fav=1')
+  } else if (cat !== undefined) {
+    router.push('/list?cat=' + encodeURIComponent(cat))
+  } else {
+    router.push('/list')
+  }
+}
 function revealPassword() { showPassword.value = !showPassword.value }
 
 async function updateTotp() {
@@ -235,6 +252,11 @@ onUnmounted(() => {
   if (totpTimer) clearInterval(totpTimer)
 })
 
+async function handleToggleFav() {
+  await store.toggleFavorite(route.params.id as string)
+  entry.value.favorite = !entry.value.favorite
+}
+
 async function handleDelete() {
   if (!confirm(i18n.t('detail.confirm_delete'))) return
   await store.deleteEntry(route.params.id as string)
@@ -249,33 +271,18 @@ async function refreshEntry() {
 
 <style scoped>
 .layout { display: flex; height: 100vh; }
-.sidebar {
-  width: 240px; background: var(--card-bg);
-  border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0;
-}
-.sidebar-header { padding: 1.25rem; border-bottom: 1px solid var(--border); }
-.sidebar-header h2 { margin: 0; font-size: 1.125rem; }
-nav { flex: 1; padding: 0.75rem; }
-.nav-item {
-  display: flex; align-items: center; gap: 0.5rem; padding: 0.625rem 0.75rem;
-  border-radius: 6px; color: var(--text); text-decoration: none; font-size: 0.9375rem;
-}
-.nav-item:hover { background: var(--hover-bg); }
 .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .top-bar {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; gap: 1rem;
   padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
 }
-.btn-back {
-  padding: 0.5rem 0.75rem; background: none; border: 1px solid var(--border);
-  border-radius: 6px; cursor: pointer; color: var(--text);
-}
 .top-actions { display: flex; gap: 0.5rem; }
+.detail-title { flex: 1; margin: 0; font-size: 1.125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .btn-edit, .btn-delete { padding: 0.5rem 0.75rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem; }
 .btn-edit { background: var(--primary); color: #fff; }
 .btn-delete { background: var(--danger); color: #fff; }
 .loading, .empty { display: flex; align-items: center; justify-content: center; height: 200px; color: var(--text-secondary); }
-.detail-content { flex: 1; overflow-y: auto; padding: 1.5rem; }
+.detail-content { flex: 1; overflow-y: auto; padding: 1.5rem; min-height: 0; }
 .detail-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; }
 .detail-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
 .detail-row:last-child { border-bottom: none; }
@@ -283,6 +290,9 @@ nav { flex: 1; padding: 0.75rem; }
 .value { flex: 1; font-size: 0.9375rem; }
 .sensitive { display: flex; align-items: center; gap: 0.5rem; }
 .btn-reveal { padding: 0.25rem 0.5rem; font-size: 0.75rem; background: none; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--primary); white-space: nowrap; }
+.btn-reveal:hover { border-color: var(--primary); }
+.btn-fav { padding: 0.25rem 0.5rem; font-size: 0.8125rem; background: none; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; white-space: nowrap; color: inherit; }
+.btn-fav:hover { border-color: var(--primary); color: var(--primary); }
 .email-line { font-size: 0.875rem; line-height: 1.6; }
 .badge-primary { display: inline-block; font-size: 0.625rem; background: var(--primary); color: #fff; padding: 0.0625rem 0.375rem; border-radius: 3px; margin-left: 0.25rem; vertical-align: middle; }
 .totp-row { display: flex; align-items: flex-start; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
@@ -293,6 +303,9 @@ nav { flex: 1; padding: 0.75rem; }
 .totp-bar { width: 48px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
 .totp-bar-fill { height: 100%; background: var(--primary); border-radius: 2px; transition: width 0.3s linear; }
 .totp-remaining { font-size: 0.8125rem; font-weight: 600; color: var(--primary); min-width: 24px; text-align: right; }
+.detail-cat-tag { display: inline-block; font-size: 0.75rem; padding: 0.0625rem 0.375rem; border-radius: 3px; background: var(--hover-bg); color: var(--text-secondary); margin-right: 0.25rem; }
 .warning-inline { color: #cc8800; font-size: 0.75rem; margin: 0.25rem 0 0; line-height: 1.3; }
+.url-link { color: var(--primary); text-decoration: none; }
+.url-link:hover { text-decoration: underline; }
 .totp-actions { flex-shrink: 0; }
 </style>

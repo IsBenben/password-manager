@@ -17,6 +17,8 @@ export interface PasswordEntry {
   twofa_secret: string | null
   note: string
   autofill_mode: string
+  category: string
+  favorite: boolean
   created_at: number
   updated_at: number
 }
@@ -30,6 +32,13 @@ export interface NewEntry {
   twofa_secret: string | null
   note: string
   autofill_mode: string
+  category: string
+  favorite: boolean
+}
+
+export interface CategoryInfo {
+  name: string
+  count: number
 }
 
 export function parseEmails(raw: string | null): EmailInfo[] {
@@ -47,16 +56,25 @@ export function serializeEmails(list: EmailInfo[]): string {
 
 export const usePasswordStore = defineStore('password', () => {
   const entries = ref<PasswordEntry[]>([])
+  const categories = ref<CategoryInfo[]>([])
   const searchQuery = ref('')
   const loading = ref(false)
 
-  async function fetchEntries(search?: string) {
+  async function fetchEntries(search?: string, category?: string, favorite?: boolean) {
     loading.value = true
     try {
-      entries.value = await invoke('list_entries', { search: search || null })
+      entries.value = await invoke('list_entries', {
+        search: search || null,
+        category: category ?? null,
+        favorite: favorite ?? null,
+      })
     } finally {
       loading.value = false
     }
+  }
+
+  async function fetchCategories() {
+    categories.value = await invoke('list_categories')
   }
 
   async function getEntry(id: string, password: string): Promise<PasswordEntry> {
@@ -76,6 +94,10 @@ export const usePasswordStore = defineStore('password', () => {
   async function deleteEntry(id: string) {
     await invoke('delete_entry', { id })
     entries.value = entries.value.filter((e) => e.id !== id)
+  }
+
+  async function toggleFavorite(id: string) {
+    await invoke('toggle_favorite', { id })
   }
 
   async function changeMasterPassword(old: string, new_: string) {
@@ -101,13 +123,16 @@ export const usePasswordStore = defineStore('password', () => {
 
   return {
     entries,
+    categories,
     searchQuery,
     loading,
     fetchEntries,
+    fetchCategories,
     getEntry,
     addEntry,
     editEntry,
     deleteEntry,
+    toggleFavorite,
     changeMasterPassword,
     generateTotp,
     generatePassword,

@@ -82,25 +82,25 @@ async function decryptEntries(siteUrl, password) {
 }
 
 function getSessionExpiry() {
-  const stored = localStorage.getItem('session_expiry');
+  const stored = sessionStorage.getItem('session_expiry');
   return stored ? parseInt(stored, 10) : 0;
 }
 
 function setSessionExpiry(durationMs) {
-  localStorage.setItem('session_expiry', String(Date.now() + durationMs));
+  sessionStorage.setItem('session_expiry', String(Date.now() + durationMs));
 }
 
 function clearSession() {
-  localStorage.removeItem('session_expiry');
-  localStorage.removeItem('current_password');
+  sessionStorage.removeItem('session_expiry');
+  sessionStorage.removeItem('current_password');
 }
 
 function getCachedPassword() {
-  return localStorage.getItem('current_password') || '';
+  return sessionStorage.getItem('current_password') || '';
 }
 
 function cachePassword(pwd) {
-  localStorage.setItem('current_password', pwd);
+  sessionStorage.setItem('current_password', pwd);
 }
 
 async function loadCustomSelectors() {
