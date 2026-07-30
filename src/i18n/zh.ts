@@ -155,6 +155,8 @@ export const zh = {
     theme_light: '浅色',
     theme_dark: '深色',
     theme_system: '跟随系统',
+    accent_color: '强调色',
+    accent_reset: '重置',
     git_commit_message: '更新密码数据',
     about: '关于',
     data_path: '数据存储位置：~/.password-manager/data.json',

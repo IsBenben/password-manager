@@ -68,6 +68,23 @@
               </div>
             </div>
             <div class="field">
+              <label>{{ i18n.t('settings.accent_color') }}</label>
+              <div class="accent-picker">
+                <button
+                  v-for="c in accentPresets"
+                  :key="c"
+                  class="accent-swatch"
+                  :class="{ active: themeStore.accentColor === c }"
+                  :style="{ background: c }"
+                  @click="setAccent(c)"
+                />
+                <label class="accent-custom" :style="{ borderColor: themeStore.accentColor && !accentPresets.includes(themeStore.accentColor) ? themeStore.accentColor : undefined }">
+                  <input type="color" :value="themeStore.accentColor || '#0071e3'" @input="setAccent(($event.target as HTMLInputElement).value)" />
+                </label>
+                <button v-if="themeStore.accentColor" class="accent-reset" @click="setAccent('')">{{ i18n.t('settings.accent_reset') }}</button>
+              </div>
+            </div>
+            <div class="field">
               <label>{{ i18n.t('settings.font_family') }}</label>
               <input v-model="fontFamily" type="text" :placeholder="i18n.t('settings.font_placeholder')" @change="updateFont" />
             </div>
@@ -139,6 +156,11 @@ const toast = useToast()
 const themeMode = ref(themeStore.theme)
 function updateTheme() {
   themeStore.set(themeMode.value)
+}
+
+const accentPresets = ['#0071e3', '#0a84ff', '#34c759', '#ff9f0a', '#ff3b30', '#bf5af2', '#ff375f', '#64d2ff']
+function setAccent(color: string) {
+  themeStore.setAccentColor(color)
 }
 
 async function updateFont() {
@@ -335,5 +357,25 @@ input:focus { outline: none; border-color: var(--primary); }
 .radio-group { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 0.25rem; }
 .radio-row { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; font-weight: 400; cursor: pointer; }
 .radio-row input[type="radio"] { width: auto; margin: 0; }
+.accent-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
+.accent-swatch {
+  width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 2px solid transparent;
+  cursor: pointer; padding: 0; transition: border-color 0.15s;
+}
+.accent-swatch.active { border-color: var(--primary); }
+.accent-swatch:hover { border-color: var(--text-secondary); }
+.accent-custom {
+  display: flex; align-items: center; justify-content: center;
+  width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 2px dashed var(--border);
+  cursor: pointer; overflow: hidden;
+}
+.accent-custom input[type="color"] {
+  width: 2rem; height: 2rem; padding: 0; border: none; cursor: pointer;
+}
+.accent-reset {
+  padding: 0.25rem 0.5rem; font-size: 0.75rem; background: none;
+  border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--text-secondary);
+}
+.accent-reset:hover { border-color: var(--primary); color: var(--primary); }
 .about-text { font-size: 0.875rem; color: var(--text-secondary); margin: 0.25rem 0; }
 </style>
