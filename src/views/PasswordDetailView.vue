@@ -264,6 +264,7 @@ onUnmounted(() => {
 async function handleToggleFav() {
   await store.toggleFavorite(route.params.id as string)
   entry.value.favorite = !entry.value.favorite
+  toast.success(i18n.t(entry.value.favorite ? 'toast.fav_on' : 'toast.fav_off'))
 }
 
 async function handleDelete() {
@@ -275,6 +276,7 @@ async function handleDelete() {
   })
   if (!ok) return
   await store.deleteEntry(route.params.id as string)
+  toast.success(i18n.t('toast.deleted'))
   router.push('/list')
 }
 
